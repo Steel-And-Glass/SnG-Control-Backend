@@ -2104,3 +2104,39 @@ pendientes entre rondas, resolucion, idempotencia y freeze SQL. La prueba de fun
 publicado anterior y comprueba aceptaciones intactas tras actualizar; las regresiones historicas tambien
 conservan IDs/snapshots/PDFs/estados. HTTP valida rol activo, atestacion, limites y multipart cerrado.
 Desplegar coordinadamente Backend + Frontend. No aplicar migraciones a la base operativa sin autorizacion.
+
+
+## Validacion integral incremental (Entrega 5)
+
+Veredicto de la validacion del 2026-11-10: APTO CON RESERVAS, no aptitud para produccion.
+`IncrementalEndToEndTests` ejercita 10 estructuras, tramos 4+6, dos Actas, respuestas parciales,
+revision/ronda nueva y cuatro tareas pendientes de radicacion mediante controladores HTTP reales,
+PostgreSQL temporal y almacenamiento sintetico. Tambien se ejecuto por el BFF Next real.
+No cambia la logica productiva ni implementa Radicacion de Vanos.
+
+El harness vive solo en el assembly de tests: vacia configuracion, usa identidad sintetica y reloj
+controlado, sin Google ni servicios externos. Requiere SNG_VERIFICATION_TEST_DATABASE hacia una
+base aislada verification_test en loopback y crea un esquema aleatorio. SNG_E2E_ARTIFACTS permite
+exportar JSON/PDF sinteticos fuera de Git. SNG_E2E_BFF_URL opcional apunta al BFF aislado; al usarlo,
+el servidor de prueba escucha en localhost:55486. Nunca usar una base o un BFF operativos.
+La simulacion de membresia revocada modifica las opciones efectivas del test; no implica hot reload
+productivo: ConfiguredRoleResolver usa IOptions y los cambios de membresia requieren reinicio.
+
+Carreras HTTP: mismo check, confirmacion/presentacion/aceptacion repetidas, dos respuestas sobre
+la misma fila y aceptacion comercial durante check de revision. Se complementan con las carreras
+PostgreSQL existentes de tramos disjuntos, reservas, cargas, aceptacion frente a cambios y fingerprints.
+Se ampliaron los seeds historicos con Acta presentada y revision pendiente, conservando filas,
+IDs, tareas, documentos disponibles, hashes y snapshots tras aplicar la cadena completa.
+
+Validacion: focalizadas 6/6; suite completa 1238 aprobadas, 11 opt-in omitidas; Release sin errores
+ni advertencias; 28 migraciones verificadas, modelo EF sin cambios pendientes. Las cuatro finales
+siguen siendo AddIncrementalFlowFoundation, EnableIncrementalMeasurements, EnableIncrementalEngineering
+y 20261110192609_EnableIncrementalCommercialOpenings. Ninguna migracion fue modificada o creada.
+Frontend: 1433 tests, lint/typecheck/build aprobados con Next 16.4.5; 53 pruebas focalizadas.
+
+El informe detallado, matriz documental/concurrencia/autorizacion, avisos Next, omisiones y guia
+manual estan en README_TECHNICAL.md del repositorio sng-control-frontend, seccion "Validacion
+integral del flujo incremental - Entrega 5" (titulo equivalente con acentos).
+Pendientes: smoke de navegador autenticado/responsive (host automatizado no disponible), Google
+corporativo, despliegue/proxy/TLS, seguridad operacional y nueve avisos en dependencias frontend
+de desarrollo. No hubo conexiones ni migraciones a la base operativa; no se probaron archivos privados.

@@ -48,6 +48,8 @@ public sealed class IncrementalFoundationTests
         var confirmed=await Seed(db,4);
         var rounds=await Seed(db,5);
         var accepted=await Seed(db,6);
+        var presented=await Seed(db,7);
+        var changesPending=await Seed(db,8);
         var incomplete=await Seed(db,2, "{\"legacy\":true}");
         var empty=await Seed(db,2, "{\"Structures\":[],\"DocumentIds\":[]}");
         var malformed=await Seed(db,2, "{\"Structures\":{},\"DocumentIds\":[]}");
@@ -83,7 +85,7 @@ public sealed class IncrementalFoundationTests
             Assert.Equal(report.Pdf,restored.Pdf); Assert.Equal(report.PdfSha256,restored.PdfSha256);
             Assert.Equal(report.SnapshotCanonical,restored.SnapshotCanonical); Assert.Equal(report.SnapshotSha256,restored.SnapshotSha256);
         }
-        Assert.Equal(4,await db.Set<OpeningRecord>().CountAsync());
+        Assert.Equal(6,await db.Set<OpeningRecord>().CountAsync());
         var acceptedActa=await db.Set<OpeningRecord>().SingleAsync(o=>o.ProjectId==accepted.Project.Id);
         var acceptance=await db.Set<OpeningAcceptance>().SingleAsync(a=>a.ProjectId==accepted.Project.Id);
         Assert.Equal(accepted.LastRound!.Id,acceptance.Id);
@@ -96,12 +98,12 @@ public sealed class IncrementalFoundationTests
         Assert.All(await db.Set<EngineeringEvidenceCheck>().Where(c=>c.ProjectId==confirmed.Project.Id).ToArrayAsync(),c=>Assert.True(c.Completed));
 
         // Replaying the compatibility projection cannot promote legacy evidence or duplicate history.
-        foreach(var p in new[]{noPdf,engineering,confirmed,rounds,accepted,incomplete,empty,malformed})
+        foreach(var p in new[]{noPdf,engineering,confirmed,rounds,accepted,presented,changesPending,incomplete,empty,malformed})
             await db.Database.ExecuteSqlInterpolatedAsync($"SELECT sng_incremental_legacy_project({p.Project.Id})");
         Assert.Equal(before,await LegacyRows(db));
         Assert.False(await db.MeasurementChecklists.AnyAsync(c=>c.IsIncremental));
         Assert.Single(await db.Set<OpeningAcceptance>().ToArrayAsync());
-        Assert.Equal(7,await db.Set<MeasurementSubmission>().CountAsync(s=>s.ProjectId!=malformed.Project.Id));
+        Assert.Equal(9,await db.Set<MeasurementSubmission>().CountAsync(s=>s.ProjectId!=malformed.Project.Id));
     }
 
     [VerificationPostgresFact]
@@ -329,8 +331,10 @@ public sealed class IncrementalFoundationTests
         var present=new ProjectTask(project.Id,OperationalArea.Commercial,ProjectTaskType.PresentOpeningRecord,"advisor",Now);present.StartUntracked(Now);
         var round=new OpeningRecordRound(ec,1,present.Id,doc.Id,Now); round.Present(Now,"advisor");
         var members=rows.Select(r=>new OpeningRecordStructure(round.Id,r.Id)).ToArray();
+        if(stage==7){db.AddRange(present,round);db.AddRange(members);await db.SaveChangesAsync();db.ChangeTracker.Clear();return new(project,checklist,rows,round);}
         var review=new ProjectTask(project.Id,OperationalArea.Engineering,ProjectTaskType.ReviewOpeningRecord,"engineer",Now);review.StartUntracked(Now);
         round.RequestChanges(Now,"advisor",review.Id,"Synthetic observation"); present.Complete(Now);
+        if(stage==8){db.AddRange(present,round,review);db.AddRange(members);await db.SaveChangesAsync();db.ChangeTracker.Clear();return new(project,checklist,rows,round);}
         round.DeclareAffected();
         var revised=Document(project.Id);round.SetDocument(revised.Id,OpeningDocumentKind.Revised);
         db.AddRange(present,round,review,revised,new OpeningRecordDocument(round,revised,OpeningDocumentKind.Revised,1,Hash(pdf),JsonSerializer.Serialize(rows.Select(r=>r.Id))));
