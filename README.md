@@ -485,3 +485,16 @@ Ingeniería trabaja checks independientes de su checklist inicial, sobre las est
 Aceptar definitivamente exige todas las estructuras Confirmadas, un PDF firmado persistido en la ronda vigente y la declaración explícita del asesor de que está firmado y corresponde al Acta presentada. El sistema conserva esa declaración; no verifica criptográficamente firmas ni deduce correspondencia por nombre. La aceptación congela la ronda, completa Comercial y crea una única «Radicación de Vanos» asignada a Ingeniería, pendiente y sin SLA. Conserva las referencias a radicación original, documentos presentado/firmado y estructuras aprobadas. Su ejecución no está implementada y la aceptación no autoriza fabricar. «Detener proyecto» permanece deshabilitado.
 
 Los expedientes anteriores se habilitan solo mediante el procedimiento controlado del manual técnico; no reciben tareas por backfill automático.
+
+## Base incremental por tramos — preparada, no activada
+
+La persistencia incluye radicaciones independientes, evidencia versionada, enmiendas, Actas
+lógicas, alcance documental, asignaciones por paquete y aceptaciones parciales con tareas
+de Radicación de Vanos vinculadas a su origen. No hay nuevas operaciones HTTP ni interfaz
+incremental: el flujo operativo descrito arriba mantiene su comportamiento.
+
+El legado se conserva sin regenerar PDFs ni reabrir tareas. Cuando el alcance no puede
+reconstruirse desde evidencia histórica, queda clasificado como
+`LEGACY_INCOMPLETE_EVIDENCE`; sigue disponible por las consultas históricas autorizadas,
+pero no alimenta operaciones incrementales que requieren evidencia completa.
+La ausencia de PDF se registra separadamente y no invalida por sí sola una radicación.

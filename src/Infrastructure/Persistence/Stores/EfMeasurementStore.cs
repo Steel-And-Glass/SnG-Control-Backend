@@ -107,7 +107,7 @@ public sealed class EfMeasurementStore(SnGControlDbContext db, TaskTiming timing
         try
         {
             task.StartUntracked(now); db.AddRange(entities); staged = await notifications.StageAsync([task], now, token);
-            await db.SaveChangesAsync(token); await tx.CommitAsync(token);
+            await db.SaveChangesAsync(token); await IncrementalLegacyProjection.SyncAsync(db, id, token); await tx.CommitAsync(token);
         }
         catch
         {
@@ -231,7 +231,7 @@ public sealed class EfMeasurementStore(SnGControlDbContext db, TaskTiming timing
                 checklist.Advance();
             }
             added.Add(new MeasurementEvent(checklist, command.RequestKey, fingerprint, command.Action == "Measure" && command.Measured == false ? "Unmeasure" : command.Action, structureId, now, actor.Subject, actor.Email, actor.Name, details is null ? null : JsonSerializer.Serialize(details), technical is null ? null : JsonSerializer.Serialize(technical), sketch is null ? null : JsonSerializer.Serialize(sketch), assessment is null ? null : JsonSerializer.Serialize(assessment)));
-            db.AddRange(added); await db.SaveChangesAsync(token); commitAttempted = true; await tx.CommitAsync(token);
+            db.AddRange(added); await db.SaveChangesAsync(token); await IncrementalLegacyProjection.SyncAsync(db, id, token); commitAttempted = true; await tx.CommitAsync(token);
         }
         catch
         {

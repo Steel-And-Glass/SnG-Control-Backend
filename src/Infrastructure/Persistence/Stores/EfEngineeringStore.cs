@@ -97,7 +97,7 @@ public sealed class EfEngineeringStore(SnGControlDbContext db, TaskTiming timing
         db.Attach(c); db.Attach(row);
         row.SetCompleted(command.Completed, now, actor.Subject); c.Advance();
         var e = new EngineeringEvent(c, command.RequestKey, fingerprint, command.Completed ? "Check" : "Uncheck", structureId, now, actor.Subject, actor.Email, actor.Name);
-        try { db.Add(e); await db.SaveChangesAsync(token); await tx.CommitAsync(token); }
+        try { db.Add(e); await db.SaveChangesAsync(token); await IncrementalLegacyProjection.SyncAsync(db, id, token); await tx.CommitAsync(token); }
         finally { db.Entry(c).State = EntityState.Detached; db.Entry(row).State = EntityState.Detached; db.Entry(e).State = EntityState.Detached; }
     }
     public async Task CloseAsync(Guid id, EngineeringClose command, DecisionActor actor, CancellationToken token)
@@ -124,7 +124,7 @@ public sealed class EfEngineeringStore(SnGControlDbContext db, TaskTiming timing
             var next = await EfOpeningRecordStore.CreateInitialAsync(db, c, roles, now, token);
             added.AddRange(next.Entities); db.AddRange(added);
             staged = await notifications.StageAsync([task, next.Task], now, token);
-            await db.SaveChangesAsync(token); await tx.CommitAsync(token);
+            await db.SaveChangesAsync(token); await IncrementalLegacyProjection.SyncAsync(db, id, token); await tx.CommitAsync(token);
         }
         catch { staged?.RestoreTracking(); throw; }
         finally { foreach (var entity in added.Concat(new object[] { c, task })) db.Entry(entity).State = EntityState.Detached; }
@@ -181,7 +181,7 @@ public sealed class EfEngineeringStore(SnGControlDbContext db, TaskTiming timing
         try
         {
             await files.SaveAsync(d.StorageKey, bytes, token);
-            db.AddRange(d, a, e); await db.SaveChangesAsync(token); commitAttempted = true; await tx.CommitAsync(token);
+            db.AddRange(d, a, e); await db.SaveChangesAsync(token); await IncrementalLegacyProjection.SyncAsync(db, id, token); commitAttempted = true; await tx.CommitAsync(token);
         }
         catch
         {
@@ -243,7 +243,7 @@ public sealed class EfEngineeringStore(SnGControlDbContext db, TaskTiming timing
             !JsonElement.DeepEquals(expected.RootElement, actual.RootElement)) throw new DocumentException(409, "MeasurementReportIntegrity");
         var created = Create(source, JsonSerializer.Deserialize<MeasurementSnapshot>(report.SnapshotCanonical)!, engineering.Subject, timing.UtcNow, actor, command.Reason.Trim());
         EfProjectNotificationWriter.NotificationWriteSet? staged = null;
-        try { db.AddRange(created.Entities); staged = await notifications.StageAsync([created.Task], timing.UtcNow, token); await db.SaveChangesAsync(token); await tx.CommitAsync(token); }
+        try { db.AddRange(created.Entities); staged = await notifications.StageAsync([created.Task], timing.UtcNow, token); await db.SaveChangesAsync(token); await IncrementalLegacyProjection.SyncAsync(db, id, token); await tx.CommitAsync(token); }
         catch { staged?.RestoreTracking(); throw; }
         finally { foreach (var entity in created.Entities) db.Entry(entity).State = EntityState.Detached; }
     }

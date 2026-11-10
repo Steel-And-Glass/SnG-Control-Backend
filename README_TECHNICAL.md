@@ -1788,3 +1788,111 @@ ConfirmStructure permite deshacer solo confirmaciones de la ronda actual, antes 
 ### Habilitación controlada de Ingeniería histórica cerrada
 
 No ejecutar sobre datos operativos sin autorización. Identificar el proyecto, checklist inicial de Ingeniería Completed, snapshot final y Acta definitiva; verificar la configuración del asesor responsable. Con Ingeniería activa/configurada/asignada, enviar POST `/api/projects/{id}/opening-records/initialize-historical` con `{ "checklistId": "<id-existente>", "reason": "<motivo-autorizado>" }`. El servidor comprueba fuente cerrada y bytes íntegros, conserva sus registros originales y crea exclusivamente la primera ronda/tarea/notificación. Repetir no duplica; no se crean tareas por migración. Revisar después GET y la bandeja del asesor. No ejecutar lotes sobre proyectos reales ni reconstruir documentos ausentes.
+
+## Base persistente incremental por tramos (Entrega 1, inactiva)
+
+### Modelo y límites de activación
+
+`20261110154907_AddIncrementalFlowFoundation` es aditiva. Su recurso SQL versionado
+`20261110152041_IncrementalFoundation.sql` forma parte de la migración, no es un script
+para ejecutar manualmente en producción. No modifica los bytes de documentos, croquis,
+snapshots anteriores, aprobaciones, tareas ni notificaciones históricas.
+
+- `MeasurementSubmission` reutiliza el SubmissionId histórico; Number es único por proyecto.
+  `MeasurementSubmissionMember` referencia el StructureId físico original, versión de evidencia,
+  posición y snapshot/hash. La primera evidencia de una estructura solo pertenece a una entrega.
+- `MeasurementAmendment` conserva entrega, versión >= 2, motivo, actor, fecha y clave/fingerprint.
+  Sus miembros son nuevas versiones de estructuras de esa misma entrega. No existe API ni
+  procedimiento de autorización de enmiendas en esta entrega.
+- `SubmissionReport` referencia el reporte histórico mediante ChecklistId sin copiar/regenerar
+  sus bytes. Los reportes nativos almacenan bytes, snapshot canónico y hashes propios por entrega
+  y versión. Los documentos asociados tienen declaración y membresía explícita por evidencia.
+- `EngineeringWorkspace` permanece abierto por proyecto; `EngineeringReceipt` registra cada
+  radicación recibida. Los checks se identifican por estructura y versión de evidencia.
+  Los checks del flujo vigente se proyectan desde su fila histórica, conservando revisión y actor.
+- `WorkPackageAssignment` guarda PackageId, área, Google Subject y fechas. EndedAt nulo
+  representa asignación activa; existe una sola asignación activa por paquete y área.
+  LegacyTaskId conserva la responsabilidad actual; no se introduce administración de personal.
+- `OpeningRecord` es la identidad lógica del Acta. Sus miembros pueden provenir de distintas
+  radicaciones. `ActiveOpeningRecordMember` es la reserva activa: PK ProjectId + StructureId
+  impide que dos Actas reserven la misma estructura. Una membresía sin reserva no constituye
+  activación. Los futuros consumidores deben reservar antes de activar un Acta.
+- `OpeningRoundLink` tiene identidad propia y numeración por Acta; LegacyRoundId opcional
+  vincula la ronda anterior sin cambiar su ID. Las nuevas identidades no crean rondas operativas.
+- `OpeningDocumentScope/Member` conserva documento, clase, versión, hash y alcance.
+  No interpreta el contenido ni valida criptográficamente firmas.
+- `OpeningAcceptance/Member` identifica cada aceptación explícita y su subconjunto, documentos
+  presentado/firmado y ronda. La misma estructura no puede aceptarse dos veces en una misma Acta.
+  Una aceptación nativa no puede quedar vacía; sus miembros deben pertenecer a ambos alcances.
+- `OpeningFilingDelivery` enlaza una aceptación con una tarea propia. ProjectTask incorpora
+  IncrementalAcceptanceId nullable, único y con FK del mismo proyecto. El índice
+  UX_ProjectTasks_FileOpeningRecord sigue protegiendo el circuito legado (Type=10 y vínculo nulo).
+  Las tareas nativas requieren aceptación y entrega explícitas; ningún endpoint actual usa
+  la fábrica `ForOpeningAcceptance`. No hay ejecución de Radicación de Vanos.
+
+Se mantienen la unicidad de los checklists/tareas originales y los índices de rondas
+activas/aceptadas por proyecto. No se habilita recepción parcial, creación múltiple de Actas,
+firma parcial ni cambios de aprobación desde HTTP. El contrato frontend permanece igual.
+La confirmación implícita de no observadas del circuito anterior no se reinterpreta mediante
+la migración; la base nueva exige membresía explícita de cada aceptación.
+
+### Clasificación histórica y evidencia
+
+La clasificación se realiza una vez desde el snapshot congelado. Nunca usa valores actuales
+de medidas para reconstruir evidencia; solo consulta identidades y pertenencia al proyecto
+para validar referencias.
+
+| Campo | Significado |
+|---|---|
+| EvidenceStatus=COMPLETE | Alcance e integrantes reconstruibles inequívocamente |
+| EvidenceStatus=LEGACY_INCOMPLETE_EVIDENCE | Alcance insuficiente o incoherente; no se crean integrantes inferidos |
+| ReportAvailability=ABSENT | No existe reporte histórico; es independiente de la integridad del alcance |
+| ReportAvailability=PRESENT | Existe reporte histórico, conservado por referencia |
+| ScopeIssue | Motivo determinista: miembros ausentes/malformados/duplicados, alcance vacío, referencias no resolubles o discrepancia de integridad |
+
+Sin PDF y con alcance verificable puede ser COMPLETE. Con PDF y sin miembros puede ser
+LEGACY_INCOMPLETE_EVIDENCE. Las firmas, Actas, rondas y tareas anteriores se conservan incluso
+en el segundo caso, sin inventar membresías. El origen sigue consultándose mediante los
+endpoints históricos y sus permisos actuales; no se agrega una ruta pública de diagnóstico.
+
+Cuando existe reporte, se conserva SnapshotCanonical exacto. Sin reporte, se conserva la
+representación del JSONB ya almacenado; no se afirma recuperar el texto previo a PostgreSQL.
+Se mantienen separados el hash calculado de esa evidencia y los hashes originales del reporte.
+No hay promoción automática a COMPLETE ni conciliación manual implementada.
+
+### Transacciones, integridad y compatibilidad
+
+`IncrementalLegacyProjection.SyncAsync` ejecuta `sng_incremental_legacy_project` después de
+persistir cambios legacy y antes del commit, bajo los locks y la autorización existentes.
+Solo materializa asociaciones derivadas; no crea tareas/notificaciones ni escribe el historial
+original. Un fallo revierte ambos modelos. Los reintentos conservan las identidades existentes.
+
+Las FKs compuestas incluyen ProjectId y la evidencia precisa. Los índices únicos protegen
+miembros, reservas activas, versiones, claves de reintento, aceptación y origen de tarea.
+Los triggers impiden actualizar/eliminar evidencia congelada y ampliar después el alcance
+de una entrega, documento o aceptación. Cinco tablas raíz tienen la columna técnica SQL
+CreationTransactionId (no expuesta en el modelo HTTP), generada con pg_current_xact_id():
+sirve para permitir inserciones atómicas incluso con savepoints EF; no es fecha, actor ni
+evidencia de negocio. Los futuros consumidores deben guardar raíces e integrantes dentro
+de una misma transacción explícita.
+
+La migración no genera procesos posteriores. Down solo permite revertir proyecciones
+derivadas: si hay evidencia incremental nativa o enmiendas, rechaza el downgrade y exige
+una migración hacia delante. No se debe usar Down para borrar trabajo operativo.
+
+### Verificación y despliegue
+
+`IncrementalFoundationTests` verifica base vacía y actualización desde la migración anterior,
+proyecto sin radicación, radicación sin PDF válida, Ingeniería abierta/cerrada, varias rondas,
+aceptación firmada, tarea de radicación pendiente y legado incompleto con/sin PDF.
+Compara filas históricas, bytes, hashes, snapshots, fechas, estados e identidades antes/después.
+También verifica tramos mezclados, aceptaciones parciales, dos tareas, enmiendas, restricciones
+entre proyectos, asignaciones, inmutabilidad, reintentos y rollback.
+
+Las pruebas PostgreSQL requieren `SNG_VERIFICATION_TEST_DATABASE` apuntando exclusivamente
+a localhost y database `verification_test`, con datos sintéticos. Las pruebas de migración
+crean esquemas aislados. No requieren Google, backend remoto ni documentos privados.
+
+Aplicar en una base operativa requiere autorización independiente. Antes de activar módulos
+incrementales futuros, implementar sus permisos/asignaciones, comandos, reservas activas,
+contratos y UI; no reutilizar las lecturas singulares legacy como si fueran colecciones.

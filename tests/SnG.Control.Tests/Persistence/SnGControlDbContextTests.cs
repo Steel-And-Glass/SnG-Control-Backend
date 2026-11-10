@@ -24,7 +24,7 @@ public class SnGControlDbContextTests
     [Theory]
     [InlineData(typeof(Client), "Clients", 4)]
     [InlineData(typeof(Project), "Projects", 11)]
-    [InlineData(typeof(ProjectTask), "ProjectTasks", 12)]
+    [InlineData(typeof(ProjectTask), "ProjectTasks", 13)]
     public void Model_MapsEntitiesWithDomainGeneratedPrimaryKeys(Type entityType, string tableName, int propertyCount)
     {
         using var context = CreateContext();
@@ -135,7 +135,7 @@ public class SnGControlDbContextTests
     {
         using var context = CreateContext();
 
-        Assert.Equal(new[] { "InitialCreate", "AddProjectTasks", "EnforceUniquePrepareQuotationTask", "EnforceSgCodeFormat", "AddBudgetQuotationCatalog", "AddCommercialQuotationHandoff", "AddCommercialIdentityAssignments", "AddCommercialQuotationConfirmation", "AddLeakTimesAndNotifications", "AddProjectDocumentsAndHandoff", "FormalizeCommercialQuotationMoney", "AddClientQuotationDecisions", "AddVersionedRequotationRounds", "AddAccountingInitialDeposit", "AddDepositVerificationReceipts", "AddDepositReceiptCorrectionTasks", "AddInstallationMeasurements", "AddInstallationActualMeasurements", "AddInstallationTechnicalSketches", "ExpandInstallationSiteDetails", "AddInstallationAssessments", "AddInstallationSubmissionReports", "AddEngineeringOpeningRecords", "AddOpeningRecordRounds" },
+        Assert.Equal(new[] { "InitialCreate", "AddProjectTasks", "EnforceUniquePrepareQuotationTask", "EnforceSgCodeFormat", "AddBudgetQuotationCatalog", "AddCommercialQuotationHandoff", "AddCommercialIdentityAssignments", "AddCommercialQuotationConfirmation", "AddLeakTimesAndNotifications", "AddProjectDocumentsAndHandoff", "FormalizeCommercialQuotationMoney", "AddClientQuotationDecisions", "AddVersionedRequotationRounds", "AddAccountingInitialDeposit", "AddDepositVerificationReceipts", "AddDepositReceiptCorrectionTasks", "AddInstallationMeasurements", "AddInstallationActualMeasurements", "AddInstallationTechnicalSketches", "ExpandInstallationSiteDetails", "AddInstallationAssessments", "AddInstallationSubmissionReports", "AddEngineeringOpeningRecords", "AddOpeningRecordRounds", "AddIncrementalFlowFoundation" },
             context.Database.GetMigrations().Select(migration => migration[(migration.IndexOf('_') + 1)..]));
         Assert.False(context.Database.HasPendingModelChanges());
     }
@@ -148,7 +148,7 @@ public class SnGControlDbContextTests
 
         foreach (var property in entity.GetProperties())
         {
-            Assert.Equal(property.Name is nameof(ProjectTask.StartedAt) or nameof(ProjectTask.CompletedAt) or nameof(ProjectTask.AssignedToGoogleSubject) or nameof(ProjectTask.DeadlineAt) or nameof(ProjectTask.WasOverdue) or nameof(ProjectTask.QuotationRound), property.IsNullable);
+            Assert.Equal(property.Name is nameof(ProjectTask.StartedAt) or nameof(ProjectTask.CompletedAt) or nameof(ProjectTask.AssignedToGoogleSubject) or nameof(ProjectTask.DeadlineAt) or nameof(ProjectTask.WasOverdue) or nameof(ProjectTask.QuotationRound) or nameof(ProjectTask.IncrementalAcceptanceId), property.IsNullable);
             Assert.False(property.IsShadowProperty());
             Assert.True(property.PropertyInfo!.SetMethod!.IsPrivate);
             if (property.ClrType == typeof(DateTime) || property.ClrType == typeof(DateTime?))
@@ -163,7 +163,11 @@ public class SnGControlDbContextTests
     {
         using var context = CreateContext();
         var entity = context.Model.FindEntityType(typeof(ProjectTask))!;
-        var foreignKey = Assert.Single(entity.GetForeignKeys());
+        Assert.Equal(2, entity.GetForeignKeys().Count());
+        var acceptance = Assert.Single(entity.GetForeignKeys(), fk => fk.PrincipalEntityType.ClrType == typeof(SnG.Control.Domain.Entities.Incremental.OpeningAcceptance));
+        Assert.Equal(new[] { "IncrementalAcceptanceId", "ProjectId" }, acceptance.Properties.Select(p => p.Name));
+        Assert.False(acceptance.IsRequired); Assert.Equal(DeleteBehavior.Restrict, acceptance.DeleteBehavior);
+        var foreignKey = Assert.Single(entity.GetForeignKeys(), fk => fk.PrincipalEntityType.ClrType == typeof(Project));
 
         Assert.Equal(nameof(ProjectTask.ProjectId), Assert.Single(foreignKey.Properties).Name);
         Assert.Equal("uuid", foreignKey.Properties[0].GetColumnType());
@@ -175,7 +179,11 @@ public class SnGControlDbContextTests
         Assert.Null(foreignKey.DependentToPrincipal);
         Assert.Null(foreignKey.PrincipalToDependent);
         var indexes = entity.GetIndexes().ToArray();
-        Assert.Equal(9, indexes.Length);
+        Assert.Equal(11, indexes.Length);
+        var filing = Assert.Single(indexes, index => index.GetDatabaseName() == "UX_ProjectTasks_FileOpeningRecord");
+        Assert.True(filing.IsUnique);
+        Assert.Equal("\"Type\" = 10 AND \"IncrementalAcceptanceId\" IS NULL", filing.GetFilter());
+        Assert.True(Assert.Single(indexes, index => index.GetDatabaseName() == "IX_ProjectTasks_IncrementalAcceptanceId").IsUnique);
         var correction = Assert.Single(indexes, index => index.GetDatabaseName() == "UX_ProjectTasks_ActiveDepositCorrection");
         Assert.True(correction.IsUnique); Assert.Equal("\"Type\" = 6 AND \"Status\" IN (1,2)", correction.GetFilter());
         var measurements = Assert.Single(indexes, index => index.GetDatabaseName() == "UX_ProjectTasks_Measurements");

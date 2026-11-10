@@ -34,6 +34,23 @@ internal static class EngineeringPostgresChecks
         Assert.False((await Store(verify).ReadAsync(id, new("manager", SystemRole.Management), default))!.CanModify);
         // Synthetic legacy fixture: remove only this test project's newly created Engineering work.
         // Installation's immutable submission/report remain untouched.
+        // Test-fixture construction only: emulate a pre-Engineering installation with no additive
+        // Engineering projection. Session-local trigger bypass never exists in application code.
+        await using (var fixture = await verify.Database.BeginTransactionAsync())
+        {
+            await verify.Database.ExecuteSqlRawAsync("SET LOCAL session_replication_role = replica");
+            await verify.Database.ExecuteSqlInterpolatedAsync($"""
+                DELETE FROM "ActiveOpeningRecordMembers" WHERE "ProjectId"={id};
+                DELETE FROM "OpeningRecordMembers" WHERE "ProjectId"={id};
+                DELETE FROM "OpeningRecords" WHERE "ProjectId"={id};
+                DELETE FROM "EngineeringEvidenceChecks" WHERE "ProjectId"={id};
+                DELETE FROM "EngineeringReceipts" WHERE "ProjectId"={id};
+                DELETE FROM "EngineeringWorkspaces" WHERE "ProjectId"={id};
+                DELETE FROM "WorkPackageMembers" WHERE "AssignmentId"={state.TaskId};
+                DELETE FROM "WorkPackageAssignments" WHERE "LegacyTaskId"={state.TaskId};
+                """);
+            await fixture.CommitAsync();
+        }
         await verify.ProjectNotifications.Where(n => n.ProjectTaskId == state.TaskId).ExecuteDeleteAsync();
         await verify.EngineeringEvents.Where(e => e.ProjectId == id).ExecuteDeleteAsync();
         await verify.EngineeringStructures.Where(e => e.ProjectId == id).ExecuteDeleteAsync();

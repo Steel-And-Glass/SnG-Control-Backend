@@ -44,6 +44,7 @@ public class SnGControlDbContext(DbContextOptions<SnGControlDbContext> options) 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        IncrementalFlowConfiguration.Configure(modelBuilder);
         modelBuilder.ApplyConfiguration(new OpeningRecordRoundConfiguration());
         modelBuilder.ApplyConfiguration(new OpeningRecordStructureConfiguration());
         modelBuilder.ApplyConfiguration(new OpeningRecordDocumentConfiguration());

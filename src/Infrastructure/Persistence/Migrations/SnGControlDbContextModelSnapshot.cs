@@ -819,6 +819,722 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.ActiveOpeningRecordMember", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("ProjectId", "StructureId");
+
+                    b.HasIndex("OpeningRecordId", "StructureId", "ProjectId");
+
+                    b.ToTable("ActiveOpeningRecordMembers", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringEvidenceCheck", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EvidenceVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ChangedBySubject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("Completed")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("LegacyChecklistId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("ProjectId", "SubmissionId", "StructureId", "EvidenceVersion");
+
+                    b.HasIndex("LegacyChecklistId", "StructureId", "ProjectId");
+
+                    b.HasIndex("SubmissionId", "StructureId", "EvidenceVersion", "ProjectId");
+
+                    b.ToTable("EngineeringEvidenceChecks", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_EngineeringEvidenceCheck", "(\"Revision\">=0 AND (NOT \"Completed\" OR (\"ChangedAt\" IS NOT NULL AND \"ChangedBySubject\" IS NOT NULL)))");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringReceipt", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("ProjectId", "SubmissionId");
+
+                    b.HasIndex("SubmissionId", "ProjectId");
+
+                    b.ToTable("EngineeringReceipts", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringWorkspace", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("ProjectId");
+
+                    b.ToTable("EngineeringWorkspaces", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.MeasurementAmendment", b =>
+                {
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ActorSubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("SubmissionId", "Version");
+
+                    b.HasIndex("SubmissionId", "ProjectId");
+
+                    b.HasIndex("SubmissionId", "RequestKey")
+                        .IsUnique();
+
+                    b.ToTable("MeasurementAmendments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_MeasurementAmendment", "(\"Version\" >= 2 AND length(btrim(\"Reason\")) > 0) AND (length(btrim(\"Reason\")) > 0) AND (length(btrim(\"ActorSubject\")) > 0) AND (length(btrim(\"Fingerprint\")) > 0)");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.MeasurementSubmission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChecklistId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EvidenceStatus")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Fingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<bool>("IsLegacy")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReportAvailability")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ScopeIssue")
+                        .HasMaxLength(160)
+                        .HasColumnType("character varying(160)");
+
+                    b.Property<string>("SnapshotCanonical")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SnapshotSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("SubmittedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SubmittedBySubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChecklistId", "ProjectId");
+
+                    b.HasIndex("ProjectId", "Number")
+                        .IsUnique();
+
+                    b.HasIndex("ProjectId", "RequestKey")
+                        .IsUnique();
+
+                    b.ToTable("MeasurementSubmissions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_MeasurementSubmission", "(\"Number\" > 0 AND \"EvidenceStatus\" IN ('COMPLETE','LEGACY_INCOMPLETE_EVIDENCE') AND \"ReportAvailability\" IN ('PRESENT','ABSENT') AND (\"IsLegacy\" OR (\"EvidenceStatus\"='COMPLETE' AND \"RequestKey\" IS NOT NULL AND \"Fingerprint\" IS NOT NULL))) AND (length(btrim(\"SubmittedBySubject\")) > 0) AND (length(btrim(\"EvidenceStatus\")) > 0) AND (length(btrim(\"ReportAvailability\")) > 0) AND (\"SnapshotSha256\" ~ '^[A-Fa-f0-9]{64}$') AND (length(btrim(\"SnapshotSha256\")) > 0)");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.MeasurementSubmissionMember", b =>
+                {
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EvidenceVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("AmendmentVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SnapshotCanonical")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SnapshotSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("SubmissionId", "StructureId", "EvidenceVersion");
+
+                    b.HasIndex("ProjectId", "StructureId")
+                        .IsUnique()
+                        .HasFilter("\"EvidenceVersion\" = 1");
+
+                    b.HasIndex("StructureId", "ProjectId");
+
+                    b.HasIndex("SubmissionId", "ProjectId");
+
+                    b.HasIndex("SubmissionId", "AmendmentVersion", "ProjectId");
+
+                    b.HasIndex("SubmissionId", "EvidenceVersion", "Position")
+                        .IsUnique();
+
+                    b.ToTable("MeasurementSubmissionMembers", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_MeasurementSubmissionMember", "(\"Position\" >= 0 AND ((\"EvidenceVersion\"=1 AND \"AmendmentVersion\" IS NULL) OR (\"EvidenceVersion\">1 AND \"AmendmentVersion\"=\"EvidenceVersion\"))) AND (\"SnapshotSha256\" ~ '^[A-Fa-f0-9]{64}$') AND (length(btrim(\"SnapshotSha256\")) > 0)");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningAcceptance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorSubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Fingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<bool>("IsLegacy")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PresentedDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SignedDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OpeningRecordId", "RequestKey")
+                        .IsUnique();
+
+                    b.HasIndex("OpeningRecordId", "PresentedDocumentId", "ProjectId");
+
+                    b.HasIndex("OpeningRecordId", "SignedDocumentId", "ProjectId");
+
+                    b.HasIndex("RoundId", "OpeningRecordId", "ProjectId");
+
+                    b.ToTable("OpeningAcceptances", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OpeningAcceptance", "(\"IsLegacy\" OR (\"RequestKey\" IS NOT NULL AND \"Fingerprint\" IS NOT NULL)) AND (length(btrim(\"ActorSubject\")) > 0)");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningAcceptanceMember", b =>
+                {
+                    b.Property<Guid>("AcceptanceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("AcceptanceId", "StructureId");
+
+                    b.HasIndex("OpeningRecordId", "StructureId")
+                        .IsUnique();
+
+                    b.HasIndex("AcceptanceId", "OpeningRecordId", "ProjectId");
+
+                    b.HasIndex("OpeningRecordId", "StructureId", "ProjectId");
+
+                    b.ToTable("OpeningAcceptanceMembers", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningDocumentMember", b =>
+                {
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("OpeningRecordId", "DocumentId", "StructureId");
+
+                    b.HasIndex("OpeningRecordId", "DocumentId", "ProjectId");
+
+                    b.HasIndex("OpeningRecordId", "StructureId", "ProjectId");
+
+                    b.ToTable("OpeningDocumentMembers", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningDocumentScope", b =>
+                {
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Declaration")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("OpeningRecordId", "DocumentId");
+
+                    b.HasIndex("OpeningRecordId", "ProjectId");
+
+                    b.HasIndex("ProjectId", "DocumentId");
+
+                    b.HasIndex("OpeningRecordId", "Kind", "Version")
+                        .IsUnique();
+
+                    b.ToTable("OpeningDocumentScopes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OpeningDocumentScope", "(\"Version\">0 AND \"Kind\" IN ('ENGINEERING','REVISED','SIGNED')) AND (length(btrim(\"Kind\")) > 0) AND (\"Sha256\" ~ '^[A-Fa-f0-9]{64}$') AND (length(btrim(\"Sha256\")) > 0) AND (length(btrim(\"Declaration\")) > 0)");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningFilingDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AcceptanceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AcceptanceId")
+                        .IsUnique();
+
+                    b.HasIndex("TaskId")
+                        .IsUnique();
+
+                    b.HasIndex("AcceptanceId", "ProjectId");
+
+                    b.HasIndex("TaskId", "ProjectId");
+
+                    b.ToTable("OpeningFilingDeliveries", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EvidenceStatus")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("LegacyChecklistId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LegacyChecklistId")
+                        .IsUnique();
+
+                    b.HasIndex("LegacyChecklistId", "ProjectId");
+
+                    b.HasIndex("ProjectId", "Number")
+                        .IsUnique();
+
+                    b.ToTable("OpeningRecords", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OpeningRecord", "(\"Number\">0 AND \"EvidenceStatus\" IN ('COMPLETE','LEGACY_INCOMPLETE_EVIDENCE')) AND (length(btrim(\"EvidenceStatus\")) > 0)");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningRecordMember", b =>
+                {
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EvidenceVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("OpeningRecordId", "StructureId");
+
+                    b.HasIndex("OpeningRecordId", "Position")
+                        .IsUnique();
+
+                    b.HasIndex("OpeningRecordId", "ProjectId");
+
+                    b.HasIndex("SubmissionId", "StructureId", "EvidenceVersion", "ProjectId");
+
+                    b.ToTable("OpeningRecordMembers", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OpeningRecordMember", "(\"Position\">=0)");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningRoundLink", b =>
+                {
+                    b.Property<Guid>("RoundId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("LegacyRoundId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("RoundId");
+
+                    b.HasIndex("LegacyRoundId")
+                        .IsUnique();
+
+                    b.HasIndex("LegacyRoundId", "ProjectId");
+
+                    b.HasIndex("OpeningRecordId", "Number")
+                        .IsUnique();
+
+                    b.HasIndex("OpeningRecordId", "ProjectId");
+
+                    b.ToTable("OpeningRoundLinks", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_OpeningRoundLink", "(\"Number\">0)");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.SubmissionDocumentMember", b =>
+                {
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EvidenceVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("SubmissionId", "DocumentId", "StructureId", "EvidenceVersion");
+
+                    b.HasIndex("SubmissionId", "DocumentId", "ProjectId");
+
+                    b.HasIndex("SubmissionId", "StructureId", "EvidenceVersion", "ProjectId");
+
+                    b.ToTable("SubmissionDocumentMembers", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.SubmissionDocumentScope", b =>
+                {
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Declaration")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("SubmissionId", "DocumentId");
+
+                    b.HasIndex("ProjectId", "DocumentId");
+
+                    b.HasIndex("SubmissionId", "ProjectId");
+
+                    b.ToTable("SubmissionDocumentScopes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SubmissionDocumentScope", "(length(btrim(\"Declaration\")) > 0)");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.SubmissionReport", b =>
+                {
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("LegacyChecklistId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("Pdf")
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("PdfSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SnapshotCanonical")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SnapshotSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("SubmissionId", "Version");
+
+                    b.HasIndex("LegacyChecklistId")
+                        .IsUnique();
+
+                    b.HasIndex("SubmissionId", "ProjectId");
+
+                    b.HasIndex("LegacyChecklistId", "ProjectId", "SubmissionId");
+
+                    b.ToTable("SubmissionReports", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_SubmissionReport", "(\"Version\">0 AND ((\"LegacyChecklistId\" IS NOT NULL AND \"Pdf\" IS NULL) OR (\"LegacyChecklistId\" IS NULL AND octet_length(\"Pdf\")>0))) AND (\"LegacyChecklistId\" IS NOT NULL OR \"PdfSha256\" ~ '^[A-Fa-f0-9]{64}$') AND (length(btrim(\"PdfSha256\")) > 0) AND (\"LegacyChecklistId\" IS NOT NULL OR \"SnapshotSha256\" ~ '^[A-Fa-f0-9]{64}$') AND (length(btrim(\"SnapshotSha256\")) > 0)");
+
+                            t.HasCheckConstraint("CK_SubmissionReport_Snapshot", "\"LegacyChecklistId\" IS NOT NULL OR \"SnapshotCanonical\" IS NOT NULL");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.WorkPackageAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Area")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("AssignedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("EndedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("LegacyTaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PackageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LegacyTaskId")
+                        .IsUnique();
+
+                    b.HasIndex("LegacyTaskId", "ProjectId");
+
+                    b.HasIndex("ProjectId", "PackageId", "Area")
+                        .IsUnique()
+                        .HasFilter("\"EndedAt\" IS NULL");
+
+                    b.ToTable("WorkPackageAssignments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_WorkPackageAssignment", "(\"Area\" IN (1,4,5) AND (\"EndedAt\" IS NULL OR \"EndedAt\">=\"AssignedAt\")) AND (length(btrim(\"Subject\")) > 0)");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.WorkPackageMember", b =>
+                {
+                    b.Property<Guid>("AssignmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EvidenceVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("AssignmentId", "StructureId");
+
+                    b.HasIndex("AssignmentId", "ProjectId");
+
+                    b.HasIndex("SubmissionId", "StructureId", "EvidenceVersion", "ProjectId");
+
+                    b.ToTable("WorkPackageMembers", (string)null);
+                });
+
             modelBuilder.Entity("SnG.Control.Domain.Entities.InitialDeposit", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1760,6 +2476,9 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                     b.Property<DateTime?>("DeadlineAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("IncrementalAcceptanceId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid");
 
@@ -1780,9 +2499,14 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("IncrementalAcceptanceId")
+                        .IsUnique();
+
                     b.HasIndex("ProjectId");
 
                     b.HasIndex("Area", "Status");
+
+                    b.HasIndex("IncrementalAcceptanceId", "ProjectId");
 
                     b.HasIndex(new[] { "ProjectId" }, "UX_ProjectTasks_ActiveDepositCorrection")
                         .IsUnique()
@@ -1794,7 +2518,7 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
 
                     b.HasIndex(new[] { "ProjectId" }, "UX_ProjectTasks_FileOpeningRecord")
                         .IsUnique()
-                        .HasFilter("\"Type\" = 10");
+                        .HasFilter("\"Type\" = 10 AND \"IncrementalAcceptanceId\" IS NULL");
 
                     b.HasIndex(new[] { "ProjectId" }, "UX_ProjectTasks_Measurements")
                         .IsUnique()
@@ -1819,6 +2543,8 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                             t.HasCheckConstraint("CK_ProjectTasks_DepositCorrection", "\"Type\" <> 6 OR (\"QuotationRound\" IS NULL AND \"Area\" = 1 AND \"DeadlineAt\" IS NULL AND \"WasOverdue\" IS NULL)");
 
                             t.HasCheckConstraint("CK_ProjectTasks_Engineering", " \"Type\" <> 7 OR (\"QuotationRound\" IS NULL AND \"Area\" = 5 AND \"DeadlineAt\" IS NULL AND \"WasOverdue\" IS NULL) ");
+
+                            t.HasCheckConstraint("CK_ProjectTasks_IncrementalAcceptance", "\"IncrementalAcceptanceId\" IS NULL OR \"Type\" = 10");
 
                             t.HasCheckConstraint("CK_ProjectTasks_Installation", "\"Type\" <> 5 OR (\"QuotationRound\" IS NULL AND \"Area\" = 4 AND \"DeadlineAt\" IS NULL AND \"WasOverdue\" IS NULL)");
 
@@ -2109,6 +2835,327 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.ActiveOpeningRecordMember", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningRecordMember", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "StructureId", "ProjectId")
+                        .HasPrincipalKey("OpeningRecordId", "StructureId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringEvidenceCheck", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.EngineeringReceipt", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId", "SubmissionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.EngineeringStructure", null)
+                        .WithMany()
+                        .HasForeignKey("LegacyChecklistId", "StructureId", "ProjectId")
+                        .HasPrincipalKey("ChecklistId", "StructureId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.MeasurementSubmissionMember", null)
+                        .WithMany()
+                        .HasForeignKey("SubmissionId", "StructureId", "EvidenceVersion", "ProjectId")
+                        .HasPrincipalKey("SubmissionId", "StructureId", "EvidenceVersion", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringReceipt", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.EngineeringWorkspace", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.MeasurementSubmission", null)
+                        .WithMany()
+                        .HasForeignKey("SubmissionId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringWorkspace", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.MeasurementAmendment", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.MeasurementSubmission", null)
+                        .WithMany()
+                        .HasForeignKey("SubmissionId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.MeasurementSubmission", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.MeasurementChecklist", null)
+                        .WithMany()
+                        .HasForeignKey("ChecklistId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.MeasurementSubmissionMember", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.MeasurementStructure", null)
+                        .WithMany()
+                        .HasForeignKey("StructureId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.MeasurementSubmission", null)
+                        .WithMany()
+                        .HasForeignKey("SubmissionId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.MeasurementAmendment", null)
+                        .WithMany()
+                        .HasForeignKey("SubmissionId", "AmendmentVersion", "ProjectId")
+                        .HasPrincipalKey("SubmissionId", "Version", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningAcceptance", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningDocumentScope", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "PresentedDocumentId", "ProjectId")
+                        .HasPrincipalKey("OpeningRecordId", "DocumentId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningDocumentScope", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "SignedDocumentId", "ProjectId")
+                        .HasPrincipalKey("OpeningRecordId", "DocumentId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningRoundLink", null)
+                        .WithMany()
+                        .HasForeignKey("RoundId", "OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("RoundId", "OpeningRecordId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningAcceptanceMember", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningAcceptance", null)
+                        .WithMany()
+                        .HasForeignKey("AcceptanceId", "OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("Id", "OpeningRecordId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningRecordMember", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "StructureId", "ProjectId")
+                        .HasPrincipalKey("OpeningRecordId", "StructureId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningDocumentMember", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningDocumentScope", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "DocumentId", "ProjectId")
+                        .HasPrincipalKey("OpeningRecordId", "DocumentId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningRecordMember", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "StructureId", "ProjectId")
+                        .HasPrincipalKey("OpeningRecordId", "StructureId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningDocumentScope", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningRecord", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.ProjectDocument", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId", "DocumentId")
+                        .HasPrincipalKey("ProjectId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningFilingDelivery", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningAcceptance", null)
+                        .WithMany()
+                        .HasForeignKey("AcceptanceId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.ProjectTask", null)
+                        .WithMany()
+                        .HasForeignKey("TaskId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningRecord", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.EngineeringWorkspace", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.EngineeringChecklist", null)
+                        .WithMany()
+                        .HasForeignKey("LegacyChecklistId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningRecordMember", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningRecord", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.MeasurementSubmissionMember", null)
+                        .WithMany()
+                        .HasForeignKey("SubmissionId", "StructureId", "EvidenceVersion", "ProjectId")
+                        .HasPrincipalKey("SubmissionId", "StructureId", "EvidenceVersion", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningRoundLink", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.OpeningRecordRound", null)
+                        .WithMany()
+                        .HasForeignKey("LegacyRoundId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningRecord", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.SubmissionDocumentMember", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.SubmissionDocumentScope", null)
+                        .WithMany()
+                        .HasForeignKey("SubmissionId", "DocumentId", "ProjectId")
+                        .HasPrincipalKey("SubmissionId", "DocumentId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.MeasurementSubmissionMember", null)
+                        .WithMany()
+                        .HasForeignKey("SubmissionId", "StructureId", "EvidenceVersion", "ProjectId")
+                        .HasPrincipalKey("SubmissionId", "StructureId", "EvidenceVersion", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.SubmissionDocumentScope", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.ProjectDocument", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId", "DocumentId")
+                        .HasPrincipalKey("ProjectId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.MeasurementSubmission", null)
+                        .WithMany()
+                        .HasForeignKey("SubmissionId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.SubmissionReport", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.MeasurementSubmission", null)
+                        .WithMany()
+                        .HasForeignKey("SubmissionId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.MeasurementReport", null)
+                        .WithMany()
+                        .HasForeignKey("LegacyChecklistId", "ProjectId", "SubmissionId")
+                        .HasPrincipalKey("ChecklistId", "ProjectId", "SubmissionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.WorkPackageAssignment", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.ProjectTask", null)
+                        .WithMany()
+                        .HasForeignKey("LegacyTaskId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.WorkPackageMember", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.WorkPackageAssignment", null)
+                        .WithMany()
+                        .HasForeignKey("AssignmentId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.MeasurementSubmissionMember", null)
+                        .WithMany()
+                        .HasForeignKey("SubmissionId", "StructureId", "EvidenceVersion", "ProjectId")
+                        .HasPrincipalKey("SubmissionId", "StructureId", "EvidenceVersion", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("SnG.Control.Domain.Entities.InitialDeposit", b =>
                 {
                     b.HasOne("SnG.Control.Domain.Entities.AccountingHandoff", null)
@@ -2395,6 +3442,12 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningAcceptance", null)
+                        .WithMany()
+                        .HasForeignKey("IncrementalAcceptanceId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("SnG.Control.Domain.Entities.RequotationRequest", b =>

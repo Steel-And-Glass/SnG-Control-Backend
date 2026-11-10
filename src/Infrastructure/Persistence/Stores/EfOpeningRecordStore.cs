@@ -156,7 +156,7 @@ public sealed class EfOpeningRecordStore(SnGControlDbContext db, TaskTiming timi
                     await VerifyDocument(id, revised.DocumentId, token);
                     r.CompleteReview(now, actor.Subject, Json(new { r.SubmissionId, r.PresentedDocumentId, RevisedDocumentId = revised.DocumentId, revised.Sha256, Structures = rows })); task.Complete(now);
                     // Release the unique active-round slot inside the same transaction before inserting its successor.
-                    await db.SaveChangesAsync(token);
+                    await db.SaveChangesAsync(token); await IncrementalLegacyProjection.SyncAsync(db, id, token);
                     var source = await db.EngineeringChecklists.AsNoTracking().SingleAsync(c => c.Id == r.ChecklistId, token);
                     var nextTask = NewTask(id, ProjectTaskType.PresentOpeningRecord, project.CreatedByGoogleSubject!, now);
                     var next = new OpeningRecordRound(source, checked(r.Number + 1), nextTask.Id, revised.DocumentId, now);
@@ -176,7 +176,7 @@ public sealed class EfOpeningRecordStore(SnGControlDbContext db, TaskTiming timi
             }
             var e = new OpeningRecordEvent(r, command.RequestKey, fingerprint, command.Action, Json(new { TaskId = task.Id, Command = command, Before = JsonSerializer.Deserialize<JsonElement>(before), After = rows }), now, actor.Subject, actor.Name);
             owned.Add(e); db.Add(e); staged = await notifications.StageAsync(changedTasks, now, token);
-            await db.SaveChangesAsync(token); await tx.CommitAsync(token);
+            await db.SaveChangesAsync(token); await IncrementalLegacyProjection.SyncAsync(db, id, token); await tx.CommitAsync(token);
         }
         catch (InvalidOperationException error) when (error.Message.StartsWith("Opening", StringComparison.Ordinal)) { staged?.RestoreTracking(); throw Conflict(error.Message); }
         catch { staged?.RestoreTracking(); throw; }
@@ -224,7 +224,7 @@ public sealed class EfOpeningRecordStore(SnGControlDbContext db, TaskTiming timi
         try
         {
             await files.SaveAsync(document.StorageKey, bytes, token); db.AddRange(document, attachment, e);
-            await db.SaveChangesAsync(token); commitAttempted = true; await tx.CommitAsync(token);
+            await db.SaveChangesAsync(token); await IncrementalLegacyProjection.SyncAsync(db, id, token); commitAttempted = true; await tx.CommitAsync(token);
         }
         catch { if (!commitAttempted) { await tx.RollbackAsync(CancellationToken.None); await files.DeleteAsync(document.StorageKey, CancellationToken.None); } throw; }
         finally { foreach (var entity in new object?[] { r, old, document, attachment, e }.OfType<object>()) db.Entry(entity).State = EntityState.Detached; }
@@ -263,7 +263,7 @@ public sealed class EfOpeningRecordStore(SnGControlDbContext db, TaskTiming timi
         var round = next.Entities.OfType<OpeningRecordRound>().Single();
         var e = new OpeningRecordEvent(round, Guid.NewGuid(), "", "InitializeHistorical", Json(new { reason, checklistId }), timing.UtcNow, actor.Subject, actor.Name);
         EfProjectNotificationWriter.NotificationWriteSet? staged = null;
-        try { db.AddRange(next.Entities); db.Add(e); staged = await notifications.StageAsync([next.Task], timing.UtcNow, token); await db.SaveChangesAsync(token); await tx.CommitAsync(token); }
+        try { db.AddRange(next.Entities); db.Add(e); staged = await notifications.StageAsync([next.Task], timing.UtcNow, token); await db.SaveChangesAsync(token); await IncrementalLegacyProjection.SyncAsync(db, id, token); await tx.CommitAsync(token); }
         catch { staged?.RestoreTracking(); throw; }
         finally { foreach (var entity in next.Entities.Append(e)) db.Entry(entity).State = EntityState.Detached; }
     }

@@ -95,6 +95,16 @@ public class ProjectTask
         if (Status == ProjectTaskStatus.InProgress && DeadlineAt is DateTime deadline && nowUtc > deadline) WasOverdue = true;
     }
 
+    // Foundation only: no current HTTP workflow calls this factory.
+    public static ProjectTask ForOpeningAcceptance(Incremental.OpeningAcceptance acceptance, string subject, DateTime at)
+    {
+        if (acceptance.IsLegacy) throw new ArgumentException("Legacy tasks retain their original identity.");
+        var task = new ProjectTask(acceptance.ProjectId, OperationalArea.Engineering, ProjectTaskType.FileOpeningRecord, subject, at);
+        task.IncrementalAcceptanceId = acceptance.Id;
+        return task;
+    }
+    public Guid? IncrementalAcceptanceId { get; private set; }
+
     private static void RequireUtc(DateTime value)
     { if (value.Kind != DateTimeKind.Utc) throw new ArgumentException("An explicit UTC instant is required."); }
 }

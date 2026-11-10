@@ -23,4 +23,5 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup><EmbeddedResource Include="Persistence/Migrations/20261110152041_IncrementalFoundation.sql" /></ItemGroup>
 </Project>
