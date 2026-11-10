@@ -5,12 +5,12 @@ namespace SnG.Control.Domain.Entities;
 public sealed class MeasurementChecklist
 {
     private MeasurementChecklist() { }
-    public MeasurementChecklist(Guid projectId, Guid quotationId, int round, Guid taskId, DateTime at, string subject)
+    public MeasurementChecklist(Guid projectId, Guid quotationId, int round, Guid taskId, DateTime at, string subject, bool isIncremental = false)
     {
         if (projectId == Guid.Empty || quotationId == Guid.Empty || taskId == Guid.Empty || round < 1) throw new ArgumentException("Invalid checklist source.");
         ValidateActor(at, subject);
         Id = Guid.NewGuid(); ProjectId = projectId; CommercialQuotationId = quotationId; QuotationRound = round; TaskId = taskId;
-        CreatedAt = at; CreatedBySubject = subject;
+        CreatedAt = at; CreatedBySubject = subject; IsIncremental = isIncremental;
     }
     public Guid Id { get; private set; }
     public Guid ProjectId { get; private set; }
@@ -19,6 +19,7 @@ public sealed class MeasurementChecklist
     public Guid TaskId { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public string CreatedBySubject { get; private set; } = "";
+    public bool IsIncremental { get; private set; }
     public long Revision { get; private set; }
     public Guid? SubmissionId { get; private set; }
     public DateTime? SubmittedAt { get; private set; }
@@ -31,6 +32,7 @@ public sealed class MeasurementChecklist
     }
     public void Submit(DateTime at, string subject, string snapshot, Guid? submissionId = null)
     {
+        if (IsIncremental) throw new InvalidOperationException("Incremental workspaces cannot be submitted globally.");
         ValidateActor(at, subject);
         if (at < CreatedAt || string.IsNullOrWhiteSpace(snapshot)) throw new ArgumentException("Invalid submission.");
         Advance(); SubmissionId = submissionId ?? Guid.NewGuid(); SubmittedAt = at; SubmittedBySubject = subject; SnapshotJson = snapshot;

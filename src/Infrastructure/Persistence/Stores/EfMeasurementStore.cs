@@ -15,7 +15,7 @@ using SnG.Control.Domain.Entities;
 using SnG.Control.Domain.Enums;
 namespace SnG.Control.Infrastructure.Persistence.Stores;
 
-public sealed class EfMeasurementStore(SnGControlDbContext db, TaskTiming timing, EfProjectNotificationWriter notifications, IFileStorage files, SnG.Control.Application.Identity.IEngineeringAssigneeIdentity? engineering = null) : IMeasurementStore
+public sealed partial class EfMeasurementStore(SnGControlDbContext db, TaskTiming timing, EfProjectNotificationWriter notifications, IFileStorage files, SnG.Control.Application.Identity.IEngineeringAssigneeIdentity? engineering = null, IncrementalMeasurementActivation? activation = null) : IMeasurementStore
 {
     public async Task<MeasurementState?> ReadAsync(Guid id, ProjectReadScope scope, CancellationToken token)
     {
@@ -30,13 +30,14 @@ public sealed class EfMeasurementStore(SnGControlDbContext db, TaskTiming timing
         var history = await db.MeasurementEvents.AsNoTracking().Where(x => x.ProjectId == id).OrderBy(x => x.Revision).ToArrayAsync(token);
         var documents = await db.ProjectDocuments.AsNoTracking().Where(d => d.ProjectId == id && d.IsMeasurementDocument && d.RemovedAt == null).OrderBy(d => d.UploadedAt).ThenBy(d => d.Id).ToArrayAsync(token);
         var views = await StructureViewsAsync(rows, token);
+        var deliveries = await DeliveriesAsync(id, token);
         await tx.CommitAsync(token);
         return new(id, task.Id, task.Status.ToString(), task.AssignedToGoogleSubject!,
             scope.Role == SystemRole.Installation && task.AssignedToGoogleSubject == scope.Subject && task.Status != ProjectTaskStatus.Completed && checklist?.SubmissionId is null,
             checklist?.Id, checklist?.Revision ?? 0, MeasurementSummary.From(rows), views,
             documents.Select(d => DocumentResponse.From(d, new HashSet<Guid>())).ToArray(),
             history.Select(e => new MeasurementHistory(e.Id, e.Action, e.StructureId, e.At, new(e.ActorEmail, e.ActorName), e.Revision, e.DetailsJson is null ? null : JsonSerializer.Deserialize<MeasurementDetailsChange>(e.DetailsJson), e.TechnicalChangeJson is null ? null : JsonSerializer.Deserialize<MeasurementTechnicalChange>(e.TechnicalChangeJson), e.SketchChangeJson is null ? null : JsonSerializer.Deserialize<MeasurementSketchChange>(e.SketchChangeJson), e.AssessmentChangeJson is null ? null : JsonSerializer.Deserialize<InstallationAssessmentChange>(e.AssessmentChangeJson))).ToArray(),
-            checklist?.SubmissionId, checklist?.SubmittedAt, checklist?.SnapshotJson is { } json ? JsonSerializer.Deserialize<MeasurementSnapshot>(json) : null);
+            checklist?.SubmissionId, checklist?.SubmittedAt, checklist?.SnapshotJson is { } json ? JsonSerializer.Deserialize<MeasurementSnapshot>(json) : null, checklist?.IsIncremental ?? false, deliveries);
     }
     private async Task<MeasurementSketchVersion?> AuthorizedSketchAsync(Guid id, Guid structureId, Guid versionId, ProjectReadScope scope, CancellationToken token)
     {
@@ -97,7 +98,8 @@ public sealed class EfMeasurementStore(SnGControlDbContext db, TaskTiming timing
         var items = await db.CommercialQuotationItems.AsNoTracking().Where(i => i.CommercialQuotationId == deposit.CommercialQuotationId).ToArrayAsync(token);
         if (items.Length == 0 || items.Any(i => i.Quantity <= 0)) throw new DocumentException(409, "MeasurementCatalogInvalid");
         var now = timing.UtcNow;
-        var checklist = new MeasurementChecklist(id, deposit.CommercialQuotationId, handoff.QuotationRound, task.Id, now, actor.Subject);
+        var createdAt = await db.Projects.Where(p => p.Id == id).Select(p => p.CreatedAt).SingleAsync(token);
+        var checklist = new MeasurementChecklist(id, deposit.CommercialQuotationId, handoff.QuotationRound, task.Id, now, actor.Subject, activation?.Includes(createdAt) == true);
         var entities = new List<object> { checklist };
         foreach (var item in items)
             for (var unit = 0; unit < item.Quantity; unit++) entities.Add(MeasurementStructure.Quoted(checklist, item, checked(unit + 1), now, actor.Subject));
@@ -107,7 +109,7 @@ public sealed class EfMeasurementStore(SnGControlDbContext db, TaskTiming timing
         try
         {
             task.StartUntracked(now); db.AddRange(entities); staged = await notifications.StageAsync([task], now, token);
-            await db.SaveChangesAsync(token); await IncrementalLegacyProjection.SyncAsync(db, id, token); await tx.CommitAsync(token);
+            await db.SaveChangesAsync(token); if (!checklist.IsIncremental) await IncrementalLegacyProjection.SyncAsync(db, id, token); await tx.CommitAsync(token);
         }
         catch
         {
@@ -171,6 +173,7 @@ public sealed class EfMeasurementStore(SnGControlDbContext db, TaskTiming timing
                 {
                     var row = rows.SingleOrDefault(r => r.Id == command.StructureId) ?? throw new DocumentException(404, "MeasurementStructureNotFound");
                     if (row.RetiredAt is not null && command.Action != "Reinstate") throw new DocumentException(409, "MeasurementStructureRetired");
+                    if (await db.Set<SnG.Control.Domain.Entities.Incremental.MeasurementSubmissionMember>().AnyAsync(m => m.ProjectId == id && m.StructureId == row.Id && m.EvidenceVersion == 1, token)) throw new DocumentException(409, "MeasurementsLocked");
                     Track(row);
                     if (command.Action is "ResolveComparison" or "RecordModification")
                     {
@@ -231,7 +234,7 @@ public sealed class EfMeasurementStore(SnGControlDbContext db, TaskTiming timing
                 checklist.Advance();
             }
             added.Add(new MeasurementEvent(checklist, command.RequestKey, fingerprint, command.Action == "Measure" && command.Measured == false ? "Unmeasure" : command.Action, structureId, now, actor.Subject, actor.Email, actor.Name, details is null ? null : JsonSerializer.Serialize(details), technical is null ? null : JsonSerializer.Serialize(technical), sketch is null ? null : JsonSerializer.Serialize(sketch), assessment is null ? null : JsonSerializer.Serialize(assessment)));
-            db.AddRange(added); await db.SaveChangesAsync(token); await IncrementalLegacyProjection.SyncAsync(db, id, token); commitAttempted = true; await tx.CommitAsync(token);
+            db.AddRange(added); await db.SaveChangesAsync(token); if (!checklist.IsIncremental) await IncrementalLegacyProjection.SyncAsync(db, id, token); commitAttempted = true; await tx.CommitAsync(token);
         }
         catch
         {
@@ -252,6 +255,7 @@ public sealed class EfMeasurementStore(SnGControlDbContext db, TaskTiming timing
     {
         var scope = new ProjectReadScope(actor.Subject, SystemRole.Installation);
         var state = await ReadAsync(id, scope, token) ?? throw new DocumentException(404, "ProjectNotFound");
+        if (state.IsIncremental) throw new DocumentException(409, "MeasurementsLocked");
         if (state.SubmissionId != null) return null; // exact command replay is checked inside the transaction
         if (string.IsNullOrWhiteSpace(engineering?.Subject)) throw new DocumentException(503, "EngineeringAssigneeNotConfigured");
         if (!state.CanModify) throw new DocumentException(403, "MeasurementAccessDenied");
@@ -334,9 +338,11 @@ public sealed class EfMeasurementStore(SnGControlDbContext db, TaskTiming timing
     }
     public async Task<MeasurementReportFile?> ReadReportAsync(Guid id, Guid submissionId, ProjectReadScope scope, CancellationToken token)
     {
-        if (scope.Role is not (SystemRole.Installation or SystemRole.Management)) return null;
+        if (scope.Role is not (SystemRole.Installation or SystemRole.Management or SystemRole.Engineering)) return null;
         var projectName = await db.Projects.AsNoTracking().Where(scope.Filter(db.ProjectTasks)).Where(p => p.Id == id).Select(p => p.Name).SingleOrDefaultAsync(token);
         if (projectName is null) return null;
+        var native = await ReadIncrementalReportAsync(id, submissionId, projectName, token);
+        if (native != null) return native;
         var report = await db.MeasurementReports.AsNoTracking().SingleOrDefaultAsync(r => r.ProjectId == id && r.SubmissionId == submissionId, token);
         if (report == null) return null;
         var snapshot = await db.MeasurementChecklists.AsNoTracking().Where(c => c.Id == report.ChecklistId && c.SubmissionId == submissionId).Select(c => c.SnapshotJson).SingleAsync(token);

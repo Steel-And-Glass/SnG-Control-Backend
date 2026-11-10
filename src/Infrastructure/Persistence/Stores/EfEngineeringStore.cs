@@ -17,7 +17,7 @@ using SnG.Control.Domain.Entities;
 using SnG.Control.Domain.Enums;
 namespace SnG.Control.Infrastructure.Persistence.Stores;
 
-public sealed class EfEngineeringStore(SnGControlDbContext db, TaskTiming timing, EfProjectNotificationWriter notifications,
+public sealed partial class EfEngineeringStore(SnGControlDbContext db, TaskTiming timing, EfProjectNotificationWriter notifications,
     IStreamingFileStorage files, IEngineeringAssigneeIdentity engineering, IRoleResolver? roles = null) : IEngineeringStore
 {
     public const int MaxPdfBytes = 25 * 1024 * 1024;
@@ -45,6 +45,7 @@ public sealed class EfEngineeringStore(SnGControlDbContext db, TaskTiming timing
     {
         await using var tx = await db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, token);
         if (!await CanRead(id, scope, token)) return null;
+        if (await IsIncrementalAsync(id, token)) return await ReadIncrementalAsync(id, scope, token);
         var c = await db.EngineeringChecklists.AsNoTracking().SingleOrDefaultAsync(c => c.ProjectId == id, token);
         if (c == null) return null;
         var task = await db.ProjectTasks.AsNoTracking().SingleAsync(t => t.Id == c.TaskId, token);
@@ -70,6 +71,7 @@ public sealed class EfEngineeringStore(SnGControlDbContext db, TaskTiming timing
     private async Task<(EngineeringChecklist C, ProjectTask Task)> Lock(Guid id, DecisionActor actor, CancellationToken token)
     {
         var tasks = await LockProject(id, token);
+        await RequireHistoricalAsync(id, token);
         var c = await db.EngineeringChecklists.AsNoTracking().SingleOrDefaultAsync(c => c.ProjectId == id, token) ?? throw new DocumentException(409, "EngineeringUnavailable");
         var task = tasks.Single(t => t.Id == c.TaskId);
         if (task.AssignedToGoogleSubject != actor.Subject || engineering.Subject != actor.Subject) throw new DocumentException(403, "EngineeringAccessDenied");
@@ -89,6 +91,7 @@ public sealed class EfEngineeringStore(SnGControlDbContext db, TaskTiming timing
     public async Task CheckAsync(Guid id, Guid structureId, EngineeringCheck command, DecisionActor actor, CancellationToken token)
     {
         await using var tx = await db.Database.BeginTransactionAsync(token);
+        if (await IsIncrementalAsync(id, token)) { await CheckIncrementalAsync(id, structureId, command, actor, token); await tx.CommitAsync(token); return; }
         var (c, task) = await Lock(id, actor, token); var fingerprint = Fingerprint(new { action = "Check", structureId, command });
         if (await Replay(c, command.RequestKey, fingerprint, actor, token)) return;
         Open(c, task);
@@ -156,6 +159,7 @@ public sealed class EfEngineeringStore(SnGControlDbContext db, TaskTiming timing
         // Authorize before consuming multipart content; repeat under locks before storing anything.
         var access = await ReadAsync(id, new(actor.Subject, SystemRole.Engineering), token);
         if (access == null) throw new DocumentException(403, "EngineeringAccessDenied");
+        await RequireHistoricalAsync(id, token);
         byte[]? bytes = null; string? name = null; Guid? replaces = null;
         await foreach (var upload in uploads.WithCancellation(token))
         {
@@ -217,8 +221,8 @@ public sealed class EfEngineeringStore(SnGControlDbContext db, TaskTiming timing
     {
         if (!await CanRead(id, scope, token)) return null;
         var row = await db.EngineeringStructures.AsNoTracking().SingleOrDefaultAsync(r => r.ProjectId == id && r.StructureId == structureId, token);
-        if (row == null) return null;
-        var source = Source(row);
+        var source = row == null ? await IncrementalSourceAsync(id, structureId, token) : Source(row);
+        if (source == null) return null;
         if (source.SketchVersionId != versionId && source.Modification?.SketchVersionId != versionId) return null;
         var sketch = await db.MeasurementSketchVersions.AsNoTracking().SingleOrDefaultAsync(v => v.Id == versionId && v.ProjectId == id && v.StructureId == structureId, token);
         if (sketch == null) return null;
@@ -230,6 +234,7 @@ public sealed class EfEngineeringStore(SnGControlDbContext db, TaskTiming timing
     {
         await using var tx = await db.Database.BeginTransactionAsync(token);
         var tasks = await LockProject(id, token);
+        await RequireHistoricalAsync(id, token);
         if (string.IsNullOrWhiteSpace(engineering.Subject) || actor.Subject != engineering.Subject) throw new DocumentException(403, "EngineeringAccessDenied");
         var existing = await db.EngineeringChecklists.AsNoTracking().SingleOrDefaultAsync(c => c.ProjectId == id, token);
         if (existing != null) { if (existing.SubmissionId != command.SubmissionId) throw new DocumentException(409, "EngineeringSourceInvalid"); return; }

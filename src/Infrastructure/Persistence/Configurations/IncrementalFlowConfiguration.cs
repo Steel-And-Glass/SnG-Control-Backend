@@ -95,6 +95,17 @@ internal static class IncrementalFlowConfiguration
             b.HasOne<EngineeringWorkspace>().WithMany().HasForeignKey(x => x.ProjectId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<MeasurementSubmission>().WithMany().HasForeignKey(x => new { x.SubmissionId, x.ProjectId }).HasPrincipalKey(x => new { x.Id, x.ProjectId }).OnDelete(DeleteBehavior.Restrict);
         });
+        model.Entity<EngineeringCheckEvent>(b =>
+        {
+            b.ToTable("EngineeringCheckEvents");
+            b.HasKey(x => new { x.ProjectId, x.RequestKey });
+            b.HasIndex(x => new { x.ProjectId, x.StructureId, x.EvidenceVersion, x.Revision }).IsUnique();
+            b.Property(x => x.Fingerprint).HasMaxLength(64);
+            b.Property(x => x.ActorSubject).HasMaxLength(200);
+            b.Property(x => x.ActorEmail).HasMaxLength(320);
+            b.Property(x => x.ActorName).HasMaxLength(200);
+            b.HasOne<EngineeringEvidenceCheck>().WithMany().HasForeignKey(x => new { x.ProjectId, x.SubmissionId, x.StructureId, x.EvidenceVersion }).OnDelete(DeleteBehavior.Restrict);
+        });
         model.Entity<EngineeringEvidenceCheck>(b =>
         {
             b.ToTable("EngineeringEvidenceChecks", t => t.HasCheckConstraint("CK_EngineeringEvidenceCheck", "(\"Revision\">=0 AND (NOT \"Completed\" OR (\"ChangedAt\" IS NOT NULL AND \"ChangedBySubject\" IS NOT NULL)))"));

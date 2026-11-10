@@ -156,7 +156,7 @@ public sealed class InstallationPdfRenderer
                 else DrawMessage(canvas, st.ItemId == null ? "Estructura agregada en obra - sin imagen de cotización" : "Imagen histórica de cotización no disponible", contentBox, font, muted);
             }
             canvas.DrawLine(Margin, 802, PageWidth - Margin, 802, border);
-            canvas.DrawText($"{Text(header.SgCode)} · Radicación {header.SubmissionId} · Versión {header.Version}", Margin, 818, small, muted);
+            canvas.DrawText($"{Text(header.SgCode)} · Radicación {header.SubmissionId} · Versión {header.Version}{(header.TrancheNumber is {} number ? $" / Tramo {number:00}" : "")}", Margin, 818, small, muted);
             var footer = $"EXPEDIENTE RADICADO · {page + 1} / {pages.Count}";
             canvas.DrawText(footer, PageWidth - Margin - labelFont.MeasureText(footer), 818, labelFont, muted);
             document.EndPage();

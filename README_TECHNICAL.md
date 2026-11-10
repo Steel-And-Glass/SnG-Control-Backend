@@ -1789,7 +1789,7 @@ ConfirmStructure permite deshacer solo confirmaciones de la ronda actual, antes 
 
 No ejecutar sobre datos operativos sin autorización. Identificar el proyecto, checklist inicial de Ingeniería Completed, snapshot final y Acta definitiva; verificar la configuración del asesor responsable. Con Ingeniería activa/configurada/asignada, enviar POST `/api/projects/{id}/opening-records/initialize-historical` con `{ "checklistId": "<id-existente>", "reason": "<motivo-autorizado>" }`. El servidor comprueba fuente cerrada y bytes íntegros, conserva sus registros originales y crea exclusivamente la primera ronda/tarea/notificación. Repetir no duplica; no se crean tareas por migración. Revisar después GET y la bandeja del asesor. No ejecutar lotes sobre proyectos reales ni reconstruir documentos ausentes.
 
-## Base persistente incremental por tramos (Entrega 1, inactiva)
+## Base persistente incremental por tramos
 
 ### Modelo y límites de activación
 
@@ -1831,8 +1831,8 @@ snapshots anteriores, aprobaciones, tareas ni notificaciones históricas.
   la fábrica `ForOpeningAcceptance`. No hay ejecución de Radicación de Vanos.
 
 Se mantienen la unicidad de los checklists/tareas originales y los índices de rondas
-activas/aceptadas por proyecto. No se habilita recepción parcial, creación múltiple de Actas,
-firma parcial ni cambios de aprobación desde HTTP. El contrato frontend permanece igual.
+activas/aceptadas por proyecto. La recepción parcial se habilita exclusivamente mediante el modo descrito abajo.
+La creación múltiple de Actas, firma parcial y cambios de aprobación incremental siguen sin API.
 La confirmación implícita de no observadas del circuito anterior no se reinterpreta mediante
 la migración; la base nueva exige membresía explícita de cada aceptación.
 
@@ -1896,3 +1896,71 @@ crean esquemas aislados. No requieren Google, backend remoto ni documentos priva
 Aplicar en una base operativa requiere autorización independiente. Antes de activar módulos
 incrementales futuros, implementar sus permisos/asignaciones, comandos, reservas activas,
 contratos y UI; no reutilizar las lecturas singulares legacy como si fueran colecciones.
+
+
+## Instalacion incremental y recepcion de Ingenieria (Entrega 2)
+
+`EnableIncrementalMeasurements` agrega solamente `MeasurementChecklist.IsIncremental`
+(default false) y `EngineeringCheckEvents`. Reutiliza las entidades de Entrega 1. No modifica
+las migraciones publicadas ni aplica cambios automaticamente. Los triggers nuevos congelan
+estructuras/croquis enviados, protegen el modo del checklist y la auditoria, impiden crear
+EngineeringChecklist global para proyectos incrementales y exigen PDF/recepcion/checks atomicos.
+Down rechaza cualquier workspace incremental o auditoria nativa; se requiere migracion hacia delante.
+
+### Activacion y expedientes en curso
+
+1. Desplegar migracion, Backend y Frontend compatibles antes de habilitar nuevos proyectos.
+2. Configurar en entorno/User Secrets `Measurements:IncrementalNewProjectsFromUtc` con un
+   corte UTC explicito terminado en Z, acordado FUTURO al primer despliegue. No retrocederlo
+   ni usar fechas anteriores para incorporar proyectos existentes. Ausencia = flujo tradicional.
+3. Al inicializar medidas, solo Project.CreatedAt >= corte crea IsIncremental=true. El valor
+   queda persistido e inmutable. Checklists existentes siempre conservan false y sus tareas;
+   no se reabren expedientes, ni se cambia el modo al reiniciar o retirar la configuracion.
+4. Exigir tambien Authentication:EngineeringAssigneeSubject configurado. Cada escritura
+   requiere rol activo, Subject configurado y tarea asignada; checks exigen ademas paquete.
+
+La habilitacion operativa requiere autorizacion separada. Esta entrega se prueba solo en
+PostgreSQL temporal; no habilita el corte ni migra bases operativas.
+
+### Contrato y consistencia
+
+POST `/api/projects/{id}/measurements/submissions` devuelve 201 con la entrega original tanto
+al confirmar como al repetir exactamente la solicitud. Body: requestKey, expectedRevision,
+structureIds (1..500 IDs fisicos unicos), documents (0..15 entradas de documentId + structureIds
+cubiertos, no vacios, contenidos en la seleccion). DocumentId identifica la version inmutable;
+Declaration conserva filename/hash/actor/UTC, y SubmissionDocumentMembers conserva el alcance.
+No requiere todos los documentos ni los duplica. Sustituir un archivo no cambia entregas previas.
+
+El fingerprint normaliza seleccion y alcance documental, incluye expectedRevision y versiones
+identificadas por sus IDs. Misma clave con otro contenido/actor => 409. Proyecto/tareas se bloquean
+antes de releer revision, estructuras y documentos y preparar PDF. El render se hace bajo ese
+lock: serializa tambien tramos disjuntos para impedir cambios durante su preparacion. Un segundo
+comando con revision antigua requiere refresco y nueva confirmacion, nunca reintento automatico.
+Esto aumenta el tiempo de retencion del lock por proyecto; medirlo en smoke antes de activar.
+
+La misma transaccion guarda entrega, miembros, report, manifiesto, auditoria de Instalacion,
+recepcion, checks y asignaciones. En el primer tramo crea una sola tarea PrepareOpeningRecord
+sin SLA e inicia EngineeringWorkspace. TakeMeasurements permanece InProgress, sin SubmissionId
+global. WorkPackageAssignment de Installation queda cerrado por entrega; Engineering queda activo.
+El fallo de cualquiera revierte todo. Reintentos inciertos conservan clave y PDF original.
+
+GET measurements agrega isIncremental y deliveries (orden Number), incluidos legados completos
+/incompletos y disponibilidad independiente del PDF. Las estructuras conservan sus IDs.
+GET `measurements/submissions/{submissionId}/report` devuelve bytes guardados, verifica hashes,
+requiere acceso de Installation/Management/Engineering y usa nombre saneado
+`Radicacion de medidas-[proyecto]-Tramo 01.pdf` para entregas nativas. A3 horizontal y tres
+estructuras por pagina se mantienen; el PDF contiene exclusivamente las fuentes seleccionadas.
+
+GET engineering en modo incremental devuelve isIncremental=true, checklistId/submissionId=null,
+deliveries y origin por fila (submissionId/number/evidenceVersion). Orden: tramo, posicion congelada.
+PUT `engineering/structures/{structureId}/check` reutiliza el contrato existente; revision individual,
+clave idempotente, actor/UTC y evento append-only. Agregar tramos no toca checks anteriores.
+`complete`, `acta` e `initialize-historical` rechazan proyectos incrementales. No se crea ningun
+Acta/ronda/presentacion/aceptacion comercial incremental ni tarea de Radicacion de Vanos.
+El circuito historico y su proyeccion de compatibilidad permanecen independientes y operativos.
+
+Pruebas: IncrementalMeasurementPostgresTests cubre 10 -> 3 -> 4, PDF 1/2 paginas, reintento
+concurrente, revisiones, freeze, nueva estructura, archivo compartido, checks y bloqueos legacy.
+IncrementalFoundationTests compara columnas historicas originales y bytes con/sin evidencia;
+IsIncremental se comprueba false por separado. Los tests HTTP cubren rol/Subject y los de contrato
+cubren limites y corte. No usar datos reales para smoke ni activar proyectos historicos.

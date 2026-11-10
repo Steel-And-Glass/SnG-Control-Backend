@@ -36,12 +36,16 @@ public sealed class MeasurementHttpTests
         Assert.Equal(expected, (int)technical.StatusCode);
         using var sketch = await fixture.Http.PostAsJsonAsync($"/api/projects/{Guid.NewGuid()}/measurements/commands", new MeasurementCommand(Guid.NewGuid(), 0, "RecordSketch", Guid.NewGuid(), Sketch: SketchFixture.Upload()));
         Assert.Equal(expected, (int)sketch.StatusCode); Assert.Equal(expected == 204 ? 5 : 0, store.Writes);
+        using var tranche = await fixture.Http.PostAsJsonAsync($"/api/projects/{Guid.NewGuid()}/measurements/submissions", new MeasurementSubmissionCommand(Guid.NewGuid(), 0, [Guid.NewGuid()], []));
+        Assert.Equal(expected == 204 ? 201 : expected, (int)tranche.StatusCode); Assert.Equal(expected == 204 ? 6 : 0, store.Writes);
         using var malformed = await fixture.Http.PostAsJsonAsync($"/api/projects/{Guid.NewGuid()}/measurements/commands", new { requestKey = Guid.NewGuid(), expectedRevision = 0, action = "Measure", actorSubject = "forged" });
         Assert.Equal(identity == "other" ? 403 : 400, (int)malformed.StatusCode);
     }
     private sealed class Store : IMeasurementStore
     {
         public int Writes { get; private set; }
+        public Task<MeasurementDelivery> SubmitAsync(Guid id, MeasurementSubmissionCommand command, DecisionActor actor, CancellationToken token)
+        { Writes++; return Task.FromResult(new MeasurementDelivery(Guid.NewGuid(), 1, DateTime.UnixEpoch, actor.Subject, "COMPLETE", null, "PRESENT", command.StructureIds, [])); }
         public Task<SketchRead?> ReadSketchAsync(Guid id, Guid structureId, Guid versionId, ProjectReadScope scope, CancellationToken token) => Task.FromResult<SketchRead?>(null);
         public Task<byte[]?> ReadSketchImageAsync(Guid id, Guid structureId, Guid versionId, ProjectReadScope scope, CancellationToken token) => Task.FromResult<byte[]?>(null);
         public Task<MeasurementState?> ReadAsync(Guid id, ProjectReadScope scope, CancellationToken token) => Task.FromResult<MeasurementState?>(null);

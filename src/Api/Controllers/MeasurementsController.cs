@@ -19,6 +19,9 @@ public sealed class MeasurementsController(MeasurementService service) : Control
         Response.Headers.CacheControl = "no-store"; Response.Headers["X-Content-Type-Options"] = "nosniff";
         return await service.ReadReportAsync(id, submissionId, token) is { } report ? File(report.Bytes, "application/pdf", report.FileName) : NotFound();
     }
+    [HttpPost("submissions")]
+    [RequestSizeLimit(131072)]
+    public async Task<IActionResult> Submit(Guid id, MeasurementSubmissionCommand body, CancellationToken token) => StatusCode(201, await service.SubmitAsync(id, body, token));
     [HttpPost("initialize")]
     public async Task<IActionResult> Initialize(Guid id, CancellationToken token)
     {

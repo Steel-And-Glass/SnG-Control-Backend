@@ -61,6 +61,13 @@ public static class DependencyInjection
         services.AddScoped<SnG.Control.Application.Features.Measurements.IMeasurementDocumentStore, EfProjectDocumentStore>();
         services.AddScoped<SnG.Control.Application.Features.Measurements.IMeasurementStore, EfMeasurementStore>();
         services.AddScoped<SnG.Control.Application.Features.Measurements.MeasurementService>();
+        services.AddSingleton(sp => {
+            var raw = sp.GetRequiredService<IConfiguration>()["Measurements:IncrementalNewProjectsFromUtc"];
+            if (string.IsNullOrWhiteSpace(raw)) return new SnG.Control.Application.Features.Measurements.IncrementalMeasurementActivation();
+            if (!raw.EndsWith("Z", StringComparison.Ordinal) || !DateTime.TryParse(raw, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AdjustToUniversal | System.Globalization.DateTimeStyles.AssumeUniversal, out var cutoff))
+                throw new InvalidOperationException("Measurements:IncrementalNewProjectsFromUtc must be an explicit UTC timestamp.");
+            return new SnG.Control.Application.Features.Measurements.IncrementalMeasurementActivation(cutoff);
+        });
         services.AddScoped<IStreamingFileStorage, LocalFileStorage>();
         services.AddScoped<IProjectDocumentArchive, ProjectDocumentArchive>();
         services.AddSingleton(TimeProvider.System);

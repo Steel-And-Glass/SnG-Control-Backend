@@ -23,7 +23,7 @@ public class CommercialQuotationModelTests
     [Fact]
     public void Schema_HasTwoSpecificTablesRestrictiveRelationsAndUsefulUniqueIndexes()
     {
-        using var db = Context(); Assert.Equal(53, db.Model.GetEntityTypes().Count());
+        using var db = Context(); Assert.Equal(54, db.Model.GetEntityTypes().Count());
         var quotation = db.Model.FindEntityType(typeof(CommercialQuotation))!;
         var item = db.Model.FindEntityType(typeof(CommercialQuotationItem))!;
         Assert.Equal(11, quotation.GetProperties().Count()); Assert.Equal(18, item.GetProperties().Count());

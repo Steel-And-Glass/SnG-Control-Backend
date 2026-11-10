@@ -486,15 +486,25 @@ Aceptar definitivamente exige todas las estructuras Confirmadas, un PDF firmado 
 
 Los expedientes anteriores se habilitan solo mediante el procedimiento controlado del manual técnico; no reciben tareas por backfill automático.
 
-## Base incremental por tramos — preparada, no activada
+## Instalacion incremental por tramos
 
 La persistencia incluye radicaciones independientes, evidencia versionada, enmiendas, Actas
 lógicas, alcance documental, asignaciones por paquete y aceptaciones parciales con tareas
-de Radicación de Vanos vinculadas a su origen. No hay nuevas operaciones HTTP ni interfaz
-incremental: el flujo operativo descrito arriba mantiene su comportamiento.
+de Radicación de Vanos vinculadas a su origen. El modo incremental permite seleccionar estructuras medidas, radicar PDFs por tramo y continuar
+Instalacion. Ingenieria acumula las entregas y conserva checks y evidencia. El flujo tradicional
+descrito arriba permanece para expedientes anteriores.
 
 El legado se conserva sin regenerar PDFs ni reabrir tareas. Cuando el alcance no puede
 reconstruirse desde evidencia histórica, queda clasificado como
 `LEGACY_INCOMPLETE_EVIDENCE`; sigue disponible por las consultas históricas autorizadas,
 pero no alimenta operaciones incrementales que requieren evidencia completa.
 La ausencia de PDF se registra separadamente y no invalida por sí sola una radicación.
+
+
+El modo se fija al iniciar el checklist, exclusivamente para proyectos nuevos posteriores al corte
+UTC explicito `Measurements:IncrementalNewProjectsFromUtc`, una vez desplegados ambos consumidores.
+Sin corte configurado se mantiene el circuito tradicional. No se aplica retroactivamente.
+Cada entrega conserva IDs, alcance documental, hashes, actor y PDF A3 de tres estructuras por pagina.
+Solo sus estructuras quedan congeladas; pueden medirse otras y agregarse nuevas.
+Ingenieria permite recepcion y checks por estructura; las Actas/cierre/presentacion comercial
+incrementales siguen bloqueados. No hay enmiendas operativas ni Radicacion de Vanos en esta entrega.

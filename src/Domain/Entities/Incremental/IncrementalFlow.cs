@@ -1,4 +1,4 @@
-// Internal persistence model only. No HTTP operations are enabled by this foundation.
+// Persistence model. Application/API expose only the explicitly enabled incremental operations.
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -291,6 +291,12 @@ public sealed class EngineeringEvidenceCheck
     public DateTime? ChangedAt { get; private set; }
     public string? ChangedBySubject { get; private set; }
     public Guid? LegacyChecklistId { get; private set; }
+    public void SetCompleted(bool completed, DateTime at, string subject)
+    {
+        MeasurementChecklist.ValidateActor(at, subject);
+        if (LegacyChecklistId != null) throw new InvalidOperationException("Legacy checks use their original workflow.");
+        Completed = completed; ChangedAt = at; ChangedBySubject = subject; Revision = checked(Revision + 1);
+    }
 }
 
 public sealed class WorkPackageAssignment

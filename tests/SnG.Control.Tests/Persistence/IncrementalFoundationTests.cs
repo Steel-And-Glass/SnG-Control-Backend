@@ -57,6 +57,7 @@ public sealed class IncrementalFoundationTests
         await db.Database.MigrateAsync();
         Assert.False(db.Database.HasPendingModelChanges());
         Assert.Equal(before,await LegacyRows(db));
+        Assert.False(await db.MeasurementChecklists.AnyAsync(c=>c.IsIncremental));
         Assert.False(await db.Set<MeasurementSubmission>().AnyAsync(s=>s.ProjectId==projectOnly.Project.Id||s.ProjectId==unsubmitted.Project.Id));
         var complete=await db.Set<MeasurementSubmission>().SingleAsync(s=>s.Id==noPdf.Checklist!.SubmissionId);
         Assert.Equal(IncrementalEvidence.Complete,complete.EvidenceStatus);
@@ -98,6 +99,7 @@ public sealed class IncrementalFoundationTests
         foreach(var p in new[]{noPdf,engineering,confirmed,rounds,accepted,incomplete,empty,malformed})
             await db.Database.ExecuteSqlInterpolatedAsync($"SELECT sng_incremental_legacy_project({p.Project.Id})");
         Assert.Equal(before,await LegacyRows(db));
+        Assert.False(await db.MeasurementChecklists.AnyAsync(c=>c.IsIncremental));
         Assert.Single(await db.Set<OpeningAcceptance>().ToArrayAsync());
         Assert.Equal(7,await db.Set<MeasurementSubmission>().CountAsync(s=>s.ProjectId!=malformed.Project.Id));
     }
@@ -231,6 +233,7 @@ public sealed class IncrementalFoundationTests
             foreach(var type in model.Model.GetEntityTypes().Where(e=>e.ClrType.Namespace=="SnG.Control.Domain.Entities.Incremental").Select(e=>e.ClrType).ToArray())
                 model.Ignore(type);
             model.Entity<ProjectTask>().Ignore(t=>t.IncrementalAcceptanceId);
+            model.Entity<MeasurementChecklist>().Ignore(t=>t.IsIncremental);
         }
     }
 
@@ -284,7 +287,7 @@ public sealed class IncrementalFoundationTests
         // Identifiers below are a closed literal list, never request-controlled.
 #pragma warning disable EF1002
         foreach(var table in new[]{"Projects","ProjectTasks","ProjectNotifications","MeasurementChecklists","MeasurementStructures","MeasurementEvents","MeasurementSketchVersions","MeasurementSubmissionDocuments","MeasurementReports","ProjectDocuments","EngineeringChecklists","EngineeringStructures","EngineeringEvents","EngineeringActas","OpeningRecordRounds","OpeningRecordStructures","OpeningRecordDocuments","OpeningRecordEvents"})
-            rows.AddRange(await db.Database.SqlQueryRaw<string>($"SELECT (to_jsonb(t) - 'IncrementalAcceptanceId')::text AS \"Value\" FROM \"{table}\" t ORDER BY to_jsonb(t)::text").ToArrayAsync());
+            rows.AddRange(await db.Database.SqlQueryRaw<string>($"SELECT (to_jsonb(t) - 'IncrementalAcceptanceId' - 'IsIncremental')::text AS \"Value\" FROM \"{table}\" t ORDER BY to_jsonb(t)::text").ToArrayAsync());
 #pragma warning restore EF1002
         return rows.ToArray();
     }

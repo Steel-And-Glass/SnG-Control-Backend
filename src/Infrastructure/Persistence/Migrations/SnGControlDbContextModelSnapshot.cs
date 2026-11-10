@@ -837,6 +837,60 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                     b.ToTable("ActiveOpeningRecordMembers", (string)null);
                 });
 
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringCheckEvent", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorEmail")
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("ActorName")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ActorSubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Completed")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("EvidenceVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("ProjectId", "RequestKey");
+
+                    b.HasIndex("ProjectId", "StructureId", "EvidenceVersion", "Revision")
+                        .IsUnique();
+
+                    b.HasIndex("ProjectId", "SubmissionId", "StructureId", "EvidenceVersion");
+
+                    b.ToTable("EngineeringCheckEvents", (string)null);
+                });
+
             modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringEvidenceCheck", b =>
                 {
                     b.Property<Guid>("ProjectId")
@@ -1620,6 +1674,9 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                     b.Property<string>("CreatedBySubject")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<bool>("IsIncremental")
+                        .HasColumnType("boolean");
 
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid");
@@ -2841,6 +2898,15 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("OpeningRecordId", "StructureId", "ProjectId")
                         .HasPrincipalKey("OpeningRecordId", "StructureId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringCheckEvent", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.EngineeringEvidenceCheck", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId", "SubmissionId", "StructureId", "EvidenceVersion")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

@@ -49,14 +49,15 @@ public sealed record MeasurementSketchChange(Guid? Before, Guid? After);
 public sealed record MeasurementHistory(Guid Id, string Action, Guid? StructureId, DateTime At, DocumentPerson Actor, long Revision, MeasurementDetailsChange? Details = null, MeasurementTechnicalChange? Technical = null, MeasurementSketchChange? Sketch = null, InstallationAssessmentChange? Assessment = null);
 public sealed record MeasurementSnapshot(Guid CommercialQuotationId, int QuotationRound, MeasurementSummary Summary,
     IReadOnlyList<MeasurementStructureView> Structures, IReadOnlyList<Guid> DocumentIds, MeasurementReportHeader? Report = null);
-public sealed record MeasurementReportHeader(Guid SubmissionId, int Version, string ProjectName, string? SgCode, string ClientName, DateTime SubmittedAt, string ResponsibleName, int Reinstated);
+public sealed record MeasurementReportHeader(Guid SubmissionId, int Version, string ProjectName, string? SgCode, string ClientName, DateTime SubmittedAt, string ResponsibleName, int Reinstated, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? TrancheNumber = null);
 public sealed record MeasurementReportFile(byte[] Bytes, string FileName);
 public sealed record MeasurementState(Guid ProjectId, Guid TaskId, string TaskStatus, string ResponsibleSubject, bool CanModify,
     Guid? ChecklistId, long Revision, MeasurementSummary Summary, IReadOnlyList<MeasurementStructureView> Structures,
     IReadOnlyList<DocumentResponse> Documents, IReadOnlyList<MeasurementHistory> History,
-    Guid? SubmissionId, DateTime? SubmittedAt, MeasurementSnapshot? Snapshot);
+    Guid? SubmissionId, DateTime? SubmittedAt, MeasurementSnapshot? Snapshot, bool IsIncremental = false, IReadOnlyList<MeasurementDelivery>? Deliveries = null);
 public interface IMeasurementStore
 {
+    Task<MeasurementDelivery> SubmitAsync(Guid id, MeasurementSubmissionCommand command, DecisionActor actor, CancellationToken token) => throw new NotSupportedException();
     Task<MeasurementReportFile?> ReadReportAsync(Guid id, Guid submissionId, ProjectReadScope scope, CancellationToken token) => Task.FromResult<MeasurementReportFile?>(null);
     Task<MeasurementState?> ReadAsync(Guid id, ProjectReadScope scope, CancellationToken token);
     Task<SketchRead?> ReadSketchAsync(Guid id, Guid structureId, Guid versionId, ProjectReadScope scope, CancellationToken token);
@@ -108,6 +109,10 @@ public sealed class MeasurementService(IMeasurementStore store, ICurrentUser cur
         };
         if (!valid) throw new DocumentException(400, "InvalidMeasurementCommand");
         return store.ExecuteAsync(id, command, Actor, token);
+    }
+    public Task<MeasurementDelivery> SubmitAsync(Guid id, MeasurementSubmissionCommand command, CancellationToken token)
+    {
+        RequireWrite(); command.Validate(); return store.SubmitAsync(id, command, Actor, token);
     }
     private void RequireWrite()
     {
