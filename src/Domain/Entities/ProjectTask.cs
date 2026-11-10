@@ -23,12 +23,12 @@ public class ProjectTask
         if (type == ProjectTaskType.RegisterInitialDeposit && area != OperationalArea.Accounting) throw new ArgumentException("Deposit tasks belong to Accounting.", nameof(area));
         if (assignedToGoogleSubject is not null) ArgumentException.ThrowIfNullOrWhiteSpace(assignedToGoogleSubject);
         AssignedToGoogleSubject = assignedToGoogleSubject;
-        if (quotationRound <= 0 || ((type is ProjectTaskType.RegisterInitialDeposit or ProjectTaskType.TakeMeasurements or ProjectTaskType.CorrectDepositReceipts or ProjectTaskType.PrepareOpeningRecord or ProjectTaskType.PresentOpeningRecord or ProjectTaskType.ReviewOpeningRecord or ProjectTaskType.FileOpeningRecord) && quotationRound is not null)) throw new ArgumentOutOfRangeException(nameof(quotationRound));
+        if (quotationRound <= 0 || ((type is ProjectTaskType.RegisterInitialDeposit or ProjectTaskType.TakeMeasurements or ProjectTaskType.CorrectDepositReceipts or ProjectTaskType.PrepareOpeningRecord or ProjectTaskType.PresentOpeningRecord or ProjectTaskType.ReviewOpeningRecord or ProjectTaskType.FileOpeningRecord or ProjectTaskType.EngineeringPackage) && quotationRound is not null)) throw new ArgumentOutOfRangeException(nameof(quotationRound));
         if (type == ProjectTaskType.TakeMeasurements && area != OperationalArea.Installation) throw new ArgumentException("Measurement tasks belong to Installation.");
         if (type == ProjectTaskType.CorrectDepositReceipts && area != OperationalArea.Commercial) throw new ArgumentException("Receipt correction tasks belong to Commercial.");
-        if (type is (ProjectTaskType.PrepareOpeningRecord or ProjectTaskType.ReviewOpeningRecord or ProjectTaskType.FileOpeningRecord) && area != OperationalArea.Engineering) throw new ArgumentException("Opening record tasks belong to Engineering.");
+        if (type is (ProjectTaskType.PrepareOpeningRecord or ProjectTaskType.ReviewOpeningRecord or ProjectTaskType.FileOpeningRecord or ProjectTaskType.EngineeringPackage) && area != OperationalArea.Engineering) throw new ArgumentException("Opening record tasks belong to Engineering.");
         if (type == ProjectTaskType.PresentOpeningRecord && area != OperationalArea.Commercial) throw new ArgumentException("Presentation tasks belong to Commercial.");
-        QuotationRound = type is ProjectTaskType.RegisterInitialDeposit or ProjectTaskType.TakeMeasurements or ProjectTaskType.CorrectDepositReceipts or ProjectTaskType.PrepareOpeningRecord or ProjectTaskType.PresentOpeningRecord or ProjectTaskType.ReviewOpeningRecord or ProjectTaskType.FileOpeningRecord ? null : quotationRound ?? 1;
+        QuotationRound = type is ProjectTaskType.RegisterInitialDeposit or ProjectTaskType.TakeMeasurements or ProjectTaskType.CorrectDepositReceipts or ProjectTaskType.PrepareOpeningRecord or ProjectTaskType.PresentOpeningRecord or ProjectTaskType.ReviewOpeningRecord or ProjectTaskType.FileOpeningRecord or ProjectTaskType.EngineeringPackage ? null : quotationRound ?? 1;
         Id = Guid.NewGuid();
         ProjectId = projectId;
         Area = area;
@@ -55,7 +55,7 @@ public class ProjectTask
 
     public void Start(DateTime startedAtUtc, DateTime deadlineAtUtc)
     {
-        if (Type is ProjectTaskType.PresentOpeningRecord or ProjectTaskType.ReviewOpeningRecord or ProjectTaskType.FileOpeningRecord) throw new InvalidOperationException("Opening record tasks have no SLA.");
+        if (Type is ProjectTaskType.PresentOpeningRecord or ProjectTaskType.ReviewOpeningRecord or ProjectTaskType.FileOpeningRecord or ProjectTaskType.EngineeringPackage) throw new InvalidOperationException("Opening record tasks have no SLA.");
         RequireUtc(startedAtUtc); RequireUtc(deadlineAtUtc);
         if (deadlineAtUtc <= startedAtUtc) throw new ArgumentException("Deadline must follow task start.", nameof(deadlineAtUtc));
         if (Status != ProjectTaskStatus.Pending || StartedAt is not null || CompletedAt is not null || DeadlineAt is not null || WasOverdue is not null)
@@ -73,7 +73,7 @@ public class ProjectTask
     public void StartUntracked(DateTime startedAtUtc)
     {
         RequireUtc(startedAtUtc);
-        if (Type is not (ProjectTaskType.RegisterInitialDeposit or ProjectTaskType.TakeMeasurements or ProjectTaskType.CorrectDepositReceipts or ProjectTaskType.PrepareOpeningRecord or ProjectTaskType.PresentOpeningRecord or ProjectTaskType.ReviewOpeningRecord or ProjectTaskType.FileOpeningRecord) || Status != ProjectTaskStatus.Pending || StartedAt is not null || CompletedAt is not null || DeadlineAt is not null || WasOverdue is not null)
+        if (Type is not (ProjectTaskType.RegisterInitialDeposit or ProjectTaskType.TakeMeasurements or ProjectTaskType.CorrectDepositReceipts or ProjectTaskType.PrepareOpeningRecord or ProjectTaskType.PresentOpeningRecord or ProjectTaskType.ReviewOpeningRecord or ProjectTaskType.FileOpeningRecord or ProjectTaskType.EngineeringPackage) || Status != ProjectTaskStatus.Pending || StartedAt is not null || CompletedAt is not null || DeadlineAt is not null || WasOverdue is not null)
             throw new InvalidOperationException("Only a pending unscheduled task can be started.");
         Status = ProjectTaskStatus.InProgress; StartedAt = startedAtUtc;
     }

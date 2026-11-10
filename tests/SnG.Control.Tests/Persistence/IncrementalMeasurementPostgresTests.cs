@@ -148,6 +148,7 @@ public sealed class IncrementalMeasurementPostgresTests
         Assert.Single(await db.ProjectTasks.Where(t => t.ProjectId == project.Id && t.Type == ProjectTaskType.PrepareOpeningRecord).ToArrayAsync());
         Assert.Empty(await db.EngineeringChecklists.Where(c => c.ProjectId == project.Id).ToArrayAsync());
         Assert.Single(await db.Set<SnG.Control.Domain.Entities.Incremental.EngineeringCheckEvent>().Where(e => e.ProjectId == project.Id).ToArrayAsync());
+        await IncrementalEngineeringPostgresChecks.VerifyAsync(Db, project.Id, storage, timing, report.Bytes);
     }
     private static async IAsyncEnumerable<DocumentUpload> NoUploads() { await Task.CompletedTask; yield break; }
     private static async Task Error(string code, Func<Task> action) => Assert.Equal(code, (await Assert.ThrowsAsync<DocumentException>(action)).Code);

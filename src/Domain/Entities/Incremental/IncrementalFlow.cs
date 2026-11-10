@@ -240,6 +240,8 @@ public sealed class EngineeringWorkspace
     }
     public Guid ProjectId { get; private set; }
     public DateTime CreatedAt { get; private set; }
+    public long Revision { get; private set; }
+    public void Advance() => Revision = checked(Revision + 1);
 }
 
 public sealed class EngineeringReceipt
@@ -329,6 +331,8 @@ public sealed class WorkPackageAssignment
     public DateTime AssignedAt { get; private set; }
     public DateTime? EndedAt { get; private set; }
     public Guid? LegacyTaskId { get; private set; }
+    public void End(DateTime at)
+    { if (EndedAt != null || at.Kind != DateTimeKind.Utc || at < AssignedAt) throw new InvalidOperationException("Invalid assignment end."); EndedAt = at; }
 }
 
 public sealed class WorkPackageMember

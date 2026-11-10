@@ -92,15 +92,22 @@ public sealed partial class EfMeasurementStore
             engineeringTask.StartUntracked(at); entities.Add(engineeringTask); entities.Add(new EngineeringWorkspace(id, at));
         }
         else if (engineeringTask!.Status != ProjectTaskStatus.InProgress || engineeringTask.AssignedToGoogleSubject != engineering!.Subject || await db.EngineeringChecklists.AnyAsync(c => c.ProjectId == id, token)) throw new DocumentException(409, "EngineeringLocked");
+        EngineeringWorkspace? changedWorkspace = null;
+        if (!newTask) {
+            var workspace = await db.Set<EngineeringWorkspace>().AsNoTracking().SingleAsync(w=>w.ProjectId==id,token);
+            db.Attach(workspace); workspace.Advance(); changedWorkspace = workspace;
+        }
         entities.Add(new EngineeringReceipt(id, submissionId, at));
         var installAssignment = new WorkPackageAssignment(Guid.NewGuid(), id, submissionId, 4, actor.Subject, at, at, null);
         var engineerAssignment = new WorkPackageAssignment(Guid.NewGuid(), id, submissionId, 5, engineering!.Subject, at, null, null);
         entities.Add(installAssignment); entities.Add(engineerAssignment);
+        entities.Add(new EngineeringPackage(engineerAssignment, true, actor.Subject));
         foreach (var row in rows)
         {
             entities.Add(new EngineeringEvidenceCheck(id, submissionId, row.Id, 1, false, 0, null, null, null));
             entities.Add(new WorkPackageMember(installAssignment.Id, id, submissionId, row.Id, 1));
-            entities.Add(new WorkPackageMember(engineerAssignment.Id, id, submissionId, row.Id, 1));
+            var member = new WorkPackageMember(engineerAssignment.Id, id, submissionId, row.Id, 1);
+            entities.Add(member); entities.Add(new EngineeringAssignedStructure(member));
         }
         db.Attach(checklist); checklist.Advance();
         entities.Add(new MeasurementEvent(checklist, command.RequestKey, fingerprint, "SubmitTranche", null, at, actor.Subject, actor.Email, actor.Name));
@@ -114,7 +121,7 @@ public sealed partial class EfMeasurementStore
             await tx.CommitAsync(token); return result;
         }
         catch { staged?.RestoreTracking(); throw; }
-        finally { foreach (var entity in entities.Append(checklist)) db.Entry(entity).State = EntityState.Detached; }
+        finally { foreach (var entity in entities.Append(checklist).Concat(changedWorkspace == null ? [] : new object[] { changedWorkspace })) db.Entry(entity).State = EntityState.Detached; }
     }
     private async Task<MeasurementReportFile?> ReadIncrementalReportAsync(Guid id, Guid submissionId, string projectName, CancellationToken token)
     {

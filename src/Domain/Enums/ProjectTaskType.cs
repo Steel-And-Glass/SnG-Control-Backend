@@ -11,5 +11,6 @@ public enum ProjectTaskType
     PrepareOpeningRecord = 7,
     PresentOpeningRecord = 8,
     ReviewOpeningRecord = 9,
-    FileOpeningRecord = 10
+    FileOpeningRecord = 10,
+    EngineeringPackage = 11
 }

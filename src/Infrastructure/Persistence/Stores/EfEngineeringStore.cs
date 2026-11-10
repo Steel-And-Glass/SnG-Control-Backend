@@ -18,7 +18,7 @@ using SnG.Control.Domain.Enums;
 namespace SnG.Control.Infrastructure.Persistence.Stores;
 
 public sealed partial class EfEngineeringStore(SnGControlDbContext db, TaskTiming timing, EfProjectNotificationWriter notifications,
-    IStreamingFileStorage files, IEngineeringAssigneeIdentity engineering, IRoleResolver? roles = null) : IEngineeringStore
+    IStreamingFileStorage files, IEngineeringAssigneeIdentity engineering, IRoleResolver? roles = null) : IEngineeringStore, IEngineeringOperationsStore
 {
     public const int MaxPdfBytes = 25 * 1024 * 1024;
     private static string Hash(byte[] value) => Convert.ToHexString(SHA256.HashData(value));

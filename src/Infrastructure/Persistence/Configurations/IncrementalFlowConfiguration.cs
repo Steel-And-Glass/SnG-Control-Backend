@@ -8,6 +8,7 @@ internal static class IncrementalFlowConfiguration
 {
     internal static void Configure(ModelBuilder model)
     {
+        EngineeringOperationsConfiguration.Configure(model);
         // Composite keys only: legacy uniqueness and operational semantics are preserved.
         model.Entity<MeasurementStructure>().HasAlternateKey(x => new { x.Id, x.ProjectId });
         model.Entity<ProjectTask>().HasAlternateKey(x => new { x.Id, x.ProjectId });

@@ -83,9 +83,11 @@ public static class DependencyInjection
         services.AddHostedService<ProjectNotificationBackgroundService>();
         services.AddBudgetsAssigneeAuthorization();
         services.AddAccountingAssigneeAuthorization();
-        services.AddOptions<EngineeringAssigneeOptions>().BindConfiguration("Authentication");
+        services.AddOptions<EngineeringAssigneeOptions>().BindConfiguration("Authentication").Validate(o => o.EngineeringWorkerSubjects != null && o.EngineeringWorkerSubjects.Length <= 100 && o.EngineeringWorkerSubjects.All(s => !string.IsNullOrWhiteSpace(s) && s == s.Trim() && s.Length <= 200) && o.EngineeringWorkerSubjects.Distinct(StringComparer.Ordinal).Count() == o.EngineeringWorkerSubjects.Length, "Configure Authentication:EngineeringWorkerSubjects with distinct non-empty Subjects.").ValidateOnStart();
         services.AddSingleton<SnG.Control.Application.Identity.IEngineeringAssigneeIdentity, ConfiguredEngineeringAssigneeIdentity>();
         services.AddScoped<SnG.Control.Application.Features.Engineering.EngineeringService>();
+        services.AddScoped<SnG.Control.Application.Features.Engineering.EngineeringOperationsService>();
+        services.AddScoped<SnG.Control.Application.Features.Engineering.IEngineeringOperationsStore, EfEngineeringStore>();
         services.AddScoped<SnG.Control.Application.Features.Engineering.IEngineeringStore, EfEngineeringStore>();
         services.AddScoped<SnG.Control.Application.Features.Engineering.IOpeningRecordStore, EfOpeningRecordStore>();
         services.AddScoped<SnG.Control.Application.Features.Engineering.OpeningRecordService>();

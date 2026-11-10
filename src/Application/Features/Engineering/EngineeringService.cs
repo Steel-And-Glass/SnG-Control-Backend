@@ -9,13 +9,13 @@ namespace SnG.Control.Application.Features.Engineering;
 public sealed record EngineeringCheck(Guid RequestKey, long ExpectedRevision, bool Completed);
 public sealed record EngineeringClose(Guid RequestKey, long ExpectedRevision, Guid DocumentId);
 public sealed record EngineeringHistorical(Guid SubmissionId, string Reason);
-public sealed record EngineeringRow(MeasurementStructureView Structure, long Revision, bool Completed, DateTime? ChangedAt, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] EngineeringOrigin? Origin = null);
+public sealed record EngineeringRow(MeasurementStructureView Structure, long Revision, bool Completed, DateTime? ChangedAt, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] EngineeringOrigin? Origin = null, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] EngineeringWork? Work = null);
 public sealed record EngineeringOrigin(Guid SubmissionId, int Number, int EvidenceVersion);
 public sealed record EngineeringDocument(DocumentResponse Document, int Version, string Sha256);
 public sealed record EngineeringHistory(string Action, Guid? StructureId, DateTime At, DocumentPerson Actor, long Revision, string? Reason);
 public sealed record EngineeringState(Guid ProjectId, Guid? ChecklistId, Guid? SubmissionId, Guid TaskId, string TaskStatus,
     string ResponsibleSubject, bool CanModify, DateTime StartedAt, DateTime? CompletedAt, long Revision, int Total, int Completed, int Pending, decimal Progress,
-    IReadOnlyList<EngineeringRow> Structures, IReadOnlyList<EngineeringDocument> Documents, Guid? CurrentDocumentId, IReadOnlyList<EngineeringHistory> History, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] bool? IsIncremental = null, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<MeasurementDelivery>? Deliveries = null);
+    IReadOnlyList<EngineeringRow> Structures, IReadOnlyList<EngineeringDocument> Documents, Guid? CurrentDocumentId, IReadOnlyList<EngineeringHistory> History, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] bool? IsIncremental = null, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<MeasurementDelivery>? Deliveries = null, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] EngineeringWorkspaceView? Workspace = null);
 public interface IEngineeringStore
 {
     Task<EngineeringState?> ReadAsync(Guid id, ProjectReadScope scope, CancellationToken token);
@@ -39,7 +39,7 @@ public sealed class EngineeringService(IEngineeringStore store, ICurrentUser cur
     { if (key == Guid.Empty || revision < 0) throw new DocumentException(400, "InvalidEngineeringCommand"); }
     public Task<EngineeringState?> ReadAsync(Guid id, CancellationToken token) => store.ReadAsync(id, Scope, token);
     public Task CheckAsync(Guid id, Guid structureId, EngineeringCheck command, CancellationToken token)
-    { RequireWrite(); Key(command.RequestKey, command.ExpectedRevision); return store.CheckAsync(id, structureId, command, Actor, token); }
+    { if (active.Role != SystemRole.Engineering || !identity.Subjects.Contains(current.Subject, StringComparer.Ordinal)) throw new DocumentException(403, "EngineeringAccessDenied"); Key(command.RequestKey, command.ExpectedRevision); return store.CheckAsync(id, structureId, command, Actor, token); }
     public Task CloseAsync(Guid id, EngineeringClose command, CancellationToken token)
     { RequireWrite(); Key(command.RequestKey, command.ExpectedRevision); if(command.DocumentId == Guid.Empty) throw new DocumentException(400, "InvalidEngineeringCommand"); return store.CloseAsync(id, command, Actor, token); }
     public Task UploadAsync(Guid id, Guid key, long revision, IAsyncEnumerable<DocumentUpload> uploads, CancellationToken token)

@@ -26,7 +26,7 @@ public sealed class ConfiguredRoleResolver(IOptions<CommercialAdvisorOptions> ad
         if (string.Equals(subject, management.Subject, StringComparison.Ordinal)) roles.Add(SystemRole.Management);
         if (string.Equals(subject, accounting.Subject, StringComparison.Ordinal)) roles.Add(SystemRole.Accounting);
         if (!string.IsNullOrWhiteSpace(installation?.Subject) && string.Equals(subject, installation.Subject, StringComparison.Ordinal)) roles.Add(SystemRole.Installation);
-        if (!string.IsNullOrWhiteSpace(engineering?.Subject) && string.Equals(subject, engineering.Subject, StringComparison.Ordinal)) roles.Add(SystemRole.Engineering);
+        if (engineering?.Subjects.Contains(subject, StringComparer.Ordinal) == true) roles.Add(SystemRole.Engineering);
         return roles;
     }
 }

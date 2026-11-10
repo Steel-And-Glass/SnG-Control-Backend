@@ -26,7 +26,7 @@ public sealed record ProjectReadScope(string Subject, SystemRole? Role)
         SystemRole.Accounting when !string.IsNullOrEmpty(Subject) => project => tasks.Any(task => task.ProjectId == project.Id
             && task.Type == ProjectTaskType.RegisterInitialDeposit && task.Area == OperationalArea.Accounting && task.AssignedToGoogleSubject == Subject),
         SystemRole.Engineering when !string.IsNullOrEmpty(Subject) => project => tasks.Any(task => task.ProjectId == project.Id
-            && (task.Type == ProjectTaskType.PrepareOpeningRecord || task.Type == ProjectTaskType.ReviewOpeningRecord || task.Type == ProjectTaskType.FileOpeningRecord) && task.Area == OperationalArea.Engineering && task.AssignedToGoogleSubject == Subject),
+            && (task.Type == ProjectTaskType.PrepareOpeningRecord || task.Type == ProjectTaskType.ReviewOpeningRecord || task.Type == ProjectTaskType.FileOpeningRecord || task.Type == ProjectTaskType.EngineeringPackage) && task.Area == OperationalArea.Engineering && task.AssignedToGoogleSubject == Subject),
         SystemRole.Installation when !string.IsNullOrEmpty(Subject) => project => tasks.Any(task => task.ProjectId == project.Id
             && task.Type == ProjectTaskType.TakeMeasurements && task.Area == OperationalArea.Installation && task.AssignedToGoogleSubject == Subject),
         _ => project => false

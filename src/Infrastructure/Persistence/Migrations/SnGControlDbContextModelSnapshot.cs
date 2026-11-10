@@ -837,6 +837,34 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                     b.ToTable("ActiveOpeningRecordMembers", (string)null);
                 });
 
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringAssignedStructure", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AssignmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EvidenceVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("SubmissionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("ProjectId", "StructureId");
+
+                    b.HasIndex("AssignmentId", "ProjectId");
+
+                    b.HasIndex("AssignmentId", "StructureId");
+
+                    b.HasIndex("ProjectId", "SubmissionId", "StructureId", "EvidenceVersion");
+
+                    b.ToTable("EngineeringAssignedStructures", (string)null);
+                });
+
             modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringCheckEvent", b =>
                 {
                     b.Property<Guid>("ProjectId")
@@ -934,6 +962,113 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringOpeningState", b =>
+                {
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConfirmationCanonical")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ConfirmationSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ConfirmedBySubject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("CreatedBySubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("CurrentDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ResponsibleSubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("OpeningRecordId");
+
+                    b.HasAlternateKey("OpeningRecordId", "ProjectId");
+
+                    b.HasIndex("OpeningRecordId", "CurrentDocumentId", "ProjectId");
+
+                    b.ToTable("EngineeringOpeningStates", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_EngineeringOpening_Confirmed", "\"Revision\">=0 AND ((\"ConfirmedAt\" IS NULL AND \"ConfirmedBySubject\" IS NULL AND \"ConfirmationCanonical\" IS NULL AND \"ConfirmationSha256\" IS NULL) OR (\"ConfirmedAt\" IS NOT NULL AND \"ConfirmedBySubject\" IS NOT NULL AND \"CurrentDocumentId\" IS NOT NULL AND \"ConfirmationCanonical\" IS NOT NULL AND \"ConfirmationSha256\" ~ '^[A-F0-9]{64}$'))");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringPackage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBySubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("CurrentAssignmentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsIntake")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid?>("TaskId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "ProjectId");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("TaskId")
+                        .IsUnique();
+
+                    b.HasIndex("CurrentAssignmentId", "ProjectId");
+
+                    b.HasIndex("TaskId", "ProjectId");
+
+                    b.ToTable("EngineeringPackages", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_EngineeringPackage_State", "\"Revision\">=0 AND \"Status\" IN ('Open','Transferred','Completed') AND ((\"Status\"='Open' AND \"CompletedAt\" IS NULL) OR (\"Status\"<>'Open' AND \"CompletedAt\">=\"CreatedAt\"))");
+                        });
+                });
+
             modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringReceipt", b =>
                 {
                     b.Property<Guid>("ProjectId")
@@ -960,9 +1095,57 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
                     b.HasKey("ProjectId");
 
                     b.ToTable("EngineeringWorkspaces", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringWorkspaceEvent", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("ActorSubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Canonical")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("TargetId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("ProjectId", "RequestKey");
+
+                    b.ToTable("EngineeringWorkspaceEvents", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_EngineeringWorkspaceEvent", "\"Revision\">=0 AND length(btrim(\"ActorSubject\"))>0 AND \"Fingerprint\" ~ '^[A-F0-9]{64}$'");
+                        });
                 });
 
             modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.MeasurementAmendment", b =>
@@ -2601,6 +2784,8 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("CK_ProjectTasks_Engineering", " \"Type\" <> 7 OR (\"QuotationRound\" IS NULL AND \"Area\" = 5 AND \"DeadlineAt\" IS NULL AND \"WasOverdue\" IS NULL) ");
 
+                            t.HasCheckConstraint("CK_ProjectTasks_EngineeringPackage", "\"Type\" <> 11 OR (\"Area\"=5 AND \"QuotationRound\" IS NULL AND \"DeadlineAt\" IS NULL AND \"WasOverdue\" IS NULL)");
+
                             t.HasCheckConstraint("CK_ProjectTasks_IncrementalAcceptance", "\"IncrementalAcceptanceId\" IS NULL OR \"Type\" = 10");
 
                             t.HasCheckConstraint("CK_ProjectTasks_Installation", "\"Type\" <> 5 OR (\"QuotationRound\" IS NULL AND \"Area\" = 4 AND \"DeadlineAt\" IS NULL AND \"WasOverdue\" IS NULL)");
@@ -2902,6 +3087,28 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringAssignedStructure", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.WorkPackageAssignment", null)
+                        .WithMany()
+                        .HasForeignKey("AssignmentId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.WorkPackageMember", null)
+                        .WithMany()
+                        .HasForeignKey("AssignmentId", "StructureId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.EngineeringEvidenceCheck", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId", "SubmissionId", "StructureId", "EvidenceVersion")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringCheckEvent", b =>
                 {
                     b.HasOne("SnG.Control.Domain.Entities.Incremental.EngineeringEvidenceCheck", null)
@@ -2933,6 +3140,44 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringOpeningState", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningRecord", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningDocumentScope", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "CurrentDocumentId", "ProjectId")
+                        .HasPrincipalKey("OpeningRecordId", "DocumentId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringPackage", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.EngineeringWorkspace", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.WorkPackageAssignment", null)
+                        .WithMany()
+                        .HasForeignKey("CurrentAssignmentId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.ProjectTask", null)
+                        .WithMany()
+                        .HasForeignKey("TaskId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringReceipt", b =>
                 {
                     b.HasOne("SnG.Control.Domain.Entities.Incremental.EngineeringWorkspace", null)
@@ -2952,6 +3197,15 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
             modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringWorkspace", b =>
                 {
                     b.HasOne("SnG.Control.Domain.Entities.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringWorkspaceEvent", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.EngineeringWorkspace", null)
                         .WithMany()
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Restrict)

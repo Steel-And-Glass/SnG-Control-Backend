@@ -55,6 +55,7 @@ public sealed class ProjectNotificationPlanner(TaskTiming timing)
         (ProjectTaskType.CorrectDepositReceipts, NotificationKind.TaskAssigned) => "Corregir comprobantes del anticipo",
         (ProjectTaskType.PresentOpeningRecord, NotificationKind.TaskAssigned) => "Presentar Acta de Vanos al cliente",
         (ProjectTaskType.ReviewOpeningRecord, NotificationKind.TaskAssigned) => "Revisar cambios del Acta de Vanos",
+        (ProjectTaskType.EngineeringPackage, NotificationKind.TaskAssigned) => "Paquete de Ingenieria asignado",
         (ProjectTaskType.FileOpeningRecord, NotificationKind.TaskAssigned) => "Radicación de Vanos",
         (ProjectTaskType.PrepareOpeningRecord, NotificationKind.TaskAssigned) => "Elaborar Acta de Vanos",
         (ProjectTaskType.TakeMeasurements, NotificationKind.TaskAssigned) => "Toma de medidas asignada",

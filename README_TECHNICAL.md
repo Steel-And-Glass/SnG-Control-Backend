@@ -1956,7 +1956,7 @@ deliveries y origin por fila (submissionId/number/evidenceVersion). Orden: tramo
 PUT `engineering/structures/{structureId}/check` reutiliza el contrato existente; revision individual,
 clave idempotente, actor/UTC y evento append-only. Agregar tramos no toca checks anteriores.
 `complete`, `acta` e `initialize-historical` rechazan proyectos incrementales. No se crea ningun
-Acta/ronda/presentacion/aceptacion comercial incremental ni tarea de Radicacion de Vanos.
+ronda/presentacion/aceptacion comercial incremental ni tarea de Radicacion de Vanos.
 El circuito historico y su proyeccion de compatibilidad permanecen independientes y operativos.
 
 Pruebas: IncrementalMeasurementPostgresTests cubre 10 -> 3 -> 4, PDF 1/2 paginas, reintento
@@ -1964,3 +1964,89 @@ concurrente, revisiones, freeze, nueva estructura, archivo compartido, checks y 
 IncrementalFoundationTests compara columnas historicas originales y bytes con/sin evidencia;
 IsIncremental se comprueba false por separado. Los tests HTTP cubren rol/Subject y los de contrato
 cubren limites y corte. No usar datos reales para smoke ni activar proyectos historicos.
+
+
+## Ingenieria incremental y multiples Actas (Entrega 3)
+
+La recepcion acumulativa conserva StructureId, SubmissionId, EvidenceVersion, orden original, snapshots,
+PDFs de Instalacion y checks previos. No crea EngineeringChecklist global para proyectos incrementales.
+`EngineeringWorkspace.Revision` controla creaciones; cada paquete, Acta y check tiene revision propia.
+Todas las escrituras toman primero el lock del proyecto y despues tareas, para serializar nuevas
+recepciones, asignaciones, reservas, checks, documentos y confirmaciones sin reemplazar evidencia.
+
+### Responsables y paquetes
+
+`Authentication:EngineeringAssigneeSubject` mantiene su significado historico y actua como coordinador.
+La lista opcional server-only `Authentication:EngineeringWorkerSubjects` permite hasta 100 Subjects
+adicionales distintos, no vacios, recortados y de hasta 200 caracteres. Todos reciben membresia Engineering
+a traves de auth/me; el rol activo y las asignaciones persistidas siguen siendo obligatorios.
+No hay descubrimiento de empleados, usuarios sinteticos operativos ni configuracion publica de Subjects.
+El coordinador asigna/reasigna paquetes a esas identidades. Un trabajador opera solo sus estructuras.
+
+`EngineeringPackage` referencia la asignacion vigente; `EngineeringAssignedStructure` es la pertenencia
+efectiva unica por proyecto/estructura. `WorkPackageAssignment/Member` conserva todos los integrantes y
+responsables historicos. Las recepciones forman paquetes de entrada; una seleccion explicita transfiere
+sus estructuras a un paquete manual, incluso entre tramos. Un paquete manual no puede ser absorbido
+por otra seleccion; la reasignacion explicita cambia el responsable del paquete completo. Paquetes
+finalizados o con estructuras reservadas en Actas no se reasignan. Una entrada totalmente transferida
+queda Transferred, sin borrar su historial.
+
+`EngineeringPackage=11` es un nuevo tipo estable de tarea Engineering sin QuotationRound ni SLA.
+Una asignacion manual crea tarea y notificacion; la reasignacion cierra la tarea anterior y crea otra,
+conservando ambos registros y el evento explicito. Las bandejas y permisos de lectura reutilizan tareas.
+El expediente historico permanece consultable por responsables anteriores; la escritura requiere la
+asignacion efectiva actual. PrepareOpeningRecord global permanece abierto para nuevas recepciones.
+
+### Actas y documentos
+
+`OpeningRecord/Member` conserva identidad logica, numero por proyecto y evidencia exacta. La reserva
+`ActiveOpeningRecordMember` tiene unicidad proyecto/estructura; tambien se conserva despues de confirmar,
+hasta que una futura entrega defina su ciclo comercial. No permite duplicar Actas iniciales.
+`EngineeringOpeningState` almacena responsable, revision, PDF vigente y confirmacion canonica con hash.
+Draft/InProgress/Ready son proyecciones oficiales segun checks y cobertura PDF; Confirmed es persistido.
+
+El manifiesto admite ampliacion explicita antes de confirmar, sin quitar miembros existentes; la UI
+ordena siempre por origen aunque las posiciones originales ya persistidas no se renumeran. Agregar
+miembros invalida la cobertura del PDF anterior. No se crean enmiendas ni se infiere evidencia vigente
+a partir de estructuras mutables: las operaciones iniciales exigen evidencia recibida version 1.
+
+Cada PDF (hasta 25 MiB) reutiliza ProjectDocument privado, validacion estructural y SHA-256. OpeningDocumentScope
+conserva version/declaracion y OpeningDocumentMember su alcance inmutable. `scopeHash` identifica exactamente
+el manifiesto declarado por el usuario; no valida semanticamente el contenido PDF. Los bytes de versiones
+anteriores no se reemplazan. Solo se puede seleccionar una version cuyo alcance coincida con el manifiesto.
+Rollback conocido elimina solo el archivo nuevo; commit incierto conserva bytes para conciliacion segura.
+
+Confirmar exige todas las estructuras trabajadas, asignacion vigente y PDF integro con cobertura exacta.
+Congela miembros, checks, documento, actor/UTC y snapshot canonico; cierra los paquetes y tareas cuyos
+integrantes efectivos ya estan todos confirmados, sin cerrar globalmente el proyecto. El estado funcional
+es "Confirmada por Ingenieria - Pendiente de habilitacion comercial incremental". No crea rondas,
+presentaciones, aprobaciones, firmas ni radicaciones comerciales. Todos los bloqueos historicos se conservan.
+
+### Contratos y persistencia
+
+GET `/api/projects/{id}/engineering` agrega `workspace` solo en modo incremental: proyecto/SG, revision,
+capacidades, identidades asignables solo para coordinador, paquetes, Actas y auditoria. Cada fila agrega
+`work` con paquete, responsable, permiso efectivo, actor del check y Acta asociada.
+
+- POST `/engineering/workspace/commands`: {requestKey, expectedRevision, action, targetId, subject, structures, documentId}.
+  Actions cerradas: CreatePackage, ReassignPackage, CreateActa, AddStructures, SelectDocument, ConfirmActa.
+  Estructuras explicitas: {structureId, submissionId, evidenceVersion}; 1..500 sin duplicados.
+- POST `/engineering/opening-records/{actaId}/documents?requestKey&expectedRevision&scopeHash`: multipart existente.
+- GET `/engineering/opening-records/{actaId}/documents/{documentId}/download`: permiso por proyecto y pertenencia exacta.
+
+`EngineeringWorkspaceEvent` conserva actor, comando canonico, fingerprint, clave y resultado. Repetir la
+misma operacion devuelve el resultado original; reutilizar clave con actor/cuerpo distintos es conflicto.
+409 no reintenta escrituras. La autorizacion se vuelve a evaluar al operar; el servidor es la autoridad.
+
+La migracion aditiva `EnableIncrementalEngineering` agrega cuatro tablas, revision del workspace y
+restricciones. Solo proyecta paquetes de entrada/asignaciones de checklists IsIncremental=true; no toca
+registros historicos, LEGACY_INCOMPLETE_EVIDENCE, documentos ni aprobaciones. Triggers impiden mutar
+confirmaciones, miembros/documentos confirmados, checks congelados, reservas de asignacion y auditoria.
+Down rechaza cualquier operacion/Acta nativa o paquete manual; no destruye trabajo. No se modificaron
+migraciones publicadas. Validar y desplegar coordinadamente con Frontend; no aplicar a la base operativa
+sin la autorizacion de despliegue correspondiente.
+
+Pruebas: PostgreSQL temporal incluye dos trabajadores, paquetes/reasignacion, Acta entre dos tramos,
+dos Actas, reserva concurrente, conflicto de revision, PDFs/versiones/cobertura/seleccion, confirmacion
+repetida, integridad SQL y continuidad. Las regresiones historicas conservan IDs/snapshots/PDFs y el
+bloqueo del consumidor comercial antiguo. No se modifica la auditoria gerencial ni Intelligence.
