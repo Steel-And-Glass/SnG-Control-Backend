@@ -1832,7 +1832,7 @@ snapshots anteriores, aprobaciones, tareas ni notificaciones históricas.
 
 Se mantienen la unicidad de los checklists/tareas originales y los índices de rondas
 activas/aceptadas por proyecto. La recepción parcial se habilita exclusivamente mediante el modo descrito abajo.
-La creación múltiple de Actas, firma parcial y cambios de aprobación incremental siguen sin API.
+La base de evidencia se consume ahora mediante las APIs de Ingenieria y Comercial incremental descritas al final.
 La confirmación implícita de no observadas del circuito anterior no se reinterpreta mediante
 la migración; la base nueva exige membresía explícita de cada aceptación.
 
@@ -1955,8 +1955,7 @@ GET engineering en modo incremental devuelve isIncremental=true, checklistId/sub
 deliveries y origin por fila (submissionId/number/evidenceVersion). Orden: tramo, posicion congelada.
 PUT `engineering/structures/{structureId}/check` reutiliza el contrato existente; revision individual,
 clave idempotente, actor/UTC y evento append-only. Agregar tramos no toca checks anteriores.
-`complete`, `acta` e `initialize-historical` rechazan proyectos incrementales. No se crea ningun
-ronda/presentacion/aceptacion comercial incremental ni tarea de Radicacion de Vanos.
+`complete`, `acta` e `initialize-historical` rechazan proyectos incrementales. El flujo comercial incremental utiliza su API separada, descrita en la seccion siguiente.
 El circuito historico y su proyeccion de compatibilidad permanecen independientes y operativos.
 
 Pruebas: IncrementalMeasurementPostgresTests cubre 10 -> 3 -> 4, PDF 1/2 paginas, reintento
@@ -2019,8 +2018,8 @@ Rollback conocido elimina solo el archivo nuevo; commit incierto conserva bytes 
 Confirmar exige todas las estructuras trabajadas, asignacion vigente y PDF integro con cobertura exacta.
 Congela miembros, checks, documento, actor/UTC y snapshot canonico; cierra los paquetes y tareas cuyos
 integrantes efectivos ya estan todos confirmados, sin cerrar globalmente el proyecto. El estado funcional
-es "Confirmada por Ingenieria - Pendiente de habilitacion comercial incremental". No crea rondas,
-presentaciones, aprobaciones, firmas ni radicaciones comerciales. Todos los bloqueos historicos se conservan.
+es "Confirmada por Ingenieria". La confirmacion crea atomicamente una tarea comercial y primera ronda
+por Acta, con asesor configurado. Los bloqueos del consumidor historico se conservan.
 
 ### Contratos y persistencia
 
@@ -2050,3 +2049,58 @@ Pruebas: PostgreSQL temporal incluye dos trabajadores, paquetes/reasignacion, Ac
 dos Actas, reserva concurrente, conflicto de revision, PDFs/versiones/cobertura/seleccion, confirmacion
 repetida, integridad SQL y continuidad. Las regresiones historicas conservan IDs/snapshots/PDFs y el
 bloqueo del consumidor comercial antiguo. No se modifica la auditoria gerencial ni Intelligence.
+
+## Comercial incremental y aceptaciones parciales (Entrega 4)
+
+Cada Acta confirmada recibe su propia tarea PresentOpeningRecord y secuencia de rondas. El asesor
+es el creador del proyecto, con membresia CommercialAdvisor configurada; si falta se rechaza el cierre.
+Para Actas confirmadas antes de esta entrega, Receive es explicito, autorizado e idempotente; la
+migracion y los GET no inventan tareas ni identidades. No se cierran globalmente areas ni proyecto.
+
+CommercialOpeningRound/Row guardan PDF presentado, evidencia por estructura, estado y revision.
+Present registra UTC en servidor. Las respuestas conservan primera respuesta, eventos individuales,
+tiempo transcurrido y resolucion completa, sin SLA. RequestChanges solo toca seleccionadas; omitidas
+siguen pendientes. Accept une confirmacion y liberacion documentada: PDF firmado persistido de la
+misma Acta/ronda, cobertura y evidencia exactas, seleccion explicita y atestacion humana obligatoria.
+No hay verificacion criptografica de firma. Cada OpeningAcceptance conserva miembros/evidencias y
+crea exactamente una OpeningFilingDelivery + FileOpeningRecord Pending, sin inicio ni plazo. Un PDF
+puede reutilizarse para subconjuntos disjuntos sin copiar bytes. No se implementa ejecutar Radicacion.
+
+Una revision Engineering por Acta agrupa solicitudes sucesivas, preservando todos los motivos en
+CommercialOpeningEvent. Cada nueva solicitud invalida declaracion/PDF revisado y reinicia solo checks
+de estructuras nuevamente solicitadas. Comercial puede responder sobre otras pendientes. Engineering
+guarda checks propios, declara las realmente cambiadas (lista vacia permitida), sube un PDF completo
+y cierra explicitamente. Se crea ronda siguiente; solo evidencia declarada cambiada incrementa version.
+Las aprobaciones no afectadas y su documento fuente permanecen; nunca respondidas siguen pendientes.
+Datos radicados de Instalacion siguen inmutables: el PDF revisado es la evidencia tecnica nueva.
+Una estructura ya liberada mediante aceptacion no admite revisiones ni otra liberacion; no se inventa
+revocacion de aceptaciones o tareas. Documentos anteriores y razones permanecen consultables.
+
+Contratos bajo `/api/projects/{id}/incremental-opening-records`:
+- GET raiz: Actas, rondas, estructuras, revisiones, documentos, aceptaciones, eventos y tiempos oficiales.
+- POST `{actaId}/commands`: Receive, Present, RequestChanges, Accept, DeclareChanged, ReviewCheck, CloseReview.
+- POST `{actaId}/rounds/{roundId}/documents`: multipart manifest JSON primero y un file PDF (25 MiB).
+- GET `{actaId}/documents/{documentId}/download`: permiso de proyecto y pertenencia exacta, adjunto privado.
+
+Comandos usan requestKey, expectedRevision y, para selecciones, structureId/evidenceVersion/expectedRevision
+por estructura (1..500, sin duplicados; DeclareChanged permite cero). ReviewCheck usa revision del check;
+DeclareChanged/CloseReview usan revision de revision Engineering. Present usa revision de ronda. Aceptar
+o pedir cambios usa revision por estructura: respuestas disjuntas no se invalidan por actividad ajena.
+PDF SIGNED fija miembros/version/documento fuente; REVISED fija cobertura completa y versiones futuras.
+Se valida rol activo + Subject + asignacion antes de replay. Fingerprint incluye Acta, comando o metadata,
+nombre/hash de archivo. Lock proyecto/tareas serializa cambios; 409 nunca reintenta automaticamente.
+Los bytes nuevos se compensan solo ante rollback conocido; commit incierto los conserva.
+
+Migracion aditiva `20261110192609_EnableIncrementalCommercialOpenings`: ocho tablas CommercialOpening*,
+FKs compuestas de proyecto/Acta/ronda/documento/evidencia, unica ronda/revision activa por Acta,
+concurrencia por revision, manifiestos/documentos/auditoria inmutables y validacion diferida de
+aceptacion firmada. El ultimo conjunto aceptado se persiste antes de congelar la ronda, dentro de la
+misma transaccion. Down rechaza rondas nativas. No cambia migraciones publicadas, PDFs ni legado
+LEGACY_INCOMPLETE_EVIDENCE. El consumidor historico sigue separado con su comportamiento autorizado.
+
+Verificacion: PostgreSQL temporal valida dos Actas, rondas independientes, omisiones pendientes,
+PDF compartido, aceptaciones simultaneas, checks/agrupacion, nuevas versiones, aprobaciones conservadas,
+pendientes entre rondas, resolucion, idempotencia y freeze SQL. La prueba de fundacion siembra el esquema
+publicado anterior y comprueba aceptaciones intactas tras actualizar; las regresiones historicas tambien
+conservan IDs/snapshots/PDFs/estados. HTTP valida rol activo, atestacion, limites y multipart cerrado.
+Desplegar coordinadamente Backend + Frontend. No aplicar migraciones a la base operativa sin autorizacion.

@@ -837,6 +837,403 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                     b.ToTable("ActiveOpeningRecordMembers", (string)null);
                 });
 
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningAcceptanceEvidence", b =>
+                {
+                    b.Property<Guid>("AcceptanceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Attested")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("EvidenceDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EvidenceVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SignedDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("AcceptanceId", "StructureId");
+
+                    b.HasIndex("AcceptanceId", "OpeningRecordId", "ProjectId");
+
+                    b.HasIndex("SignedDocumentId", "StructureId", "RoundId", "OpeningRecordId", "ProjectId", "EvidenceVersion", "EvidenceDocumentId");
+
+                    b.ToTable("CommercialOpeningAcceptanceEvidence", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CommercialOpeningAcceptanceEvidence", "\"Attested\" AND \"EvidenceVersion\">0");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningDocument", b =>
+                {
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ReviewId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ScopeCanonical")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ScopeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("DocumentId");
+
+                    b.HasIndex("OpeningRecordId", "DocumentId", "ProjectId");
+
+                    b.HasIndex("RoundId", "OpeningRecordId", "ProjectId");
+
+                    b.HasIndex("ReviewId", "RoundId", "OpeningRecordId", "ProjectId");
+
+                    b.ToTable("CommercialOpeningDocuments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CommercialOpeningDocument", "\"Kind\" IN ('SIGNED','REVISED') AND ((\"Kind\"='REVISED' AND \"ReviewId\" IS NOT NULL) OR (\"Kind\"='SIGNED' AND \"ReviewId\" IS NULL)) AND \"ScopeHash\" ~ '^[A-F0-9]{64}$'");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningDocumentMember", b =>
+                {
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EvidenceDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EvidenceVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("DocumentId", "StructureId");
+
+                    b.HasIndex("OpeningRecordId", "EvidenceDocumentId", "ProjectId");
+
+                    b.HasIndex("DocumentId", "RoundId", "OpeningRecordId", "ProjectId");
+
+                    b.HasIndex("RoundId", "StructureId", "OpeningRecordId", "ProjectId");
+
+                    b.ToTable("CommercialOpeningDocumentMembers", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CommercialOpeningDocumentMember", "\"EvidenceVersion\">0");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningEvent", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("ActorSubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Canonical")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ResultId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("ProjectId", "RequestKey");
+
+                    b.HasIndex("RoundId", "OpeningRecordId", "ProjectId");
+
+                    b.ToTable("CommercialOpeningEvents", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("Declared")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OpeningRecordId")
+                        .IsUnique()
+                        .HasFilter("\"CompletedAt\" IS NULL");
+
+                    b.HasIndex("TaskId")
+                        .IsUnique();
+
+                    b.HasIndex("TaskId", "ProjectId");
+
+                    b.HasIndex("OpeningRecordId", "DocumentId", "ProjectId");
+
+                    b.HasIndex("RoundId", "OpeningRecordId", "ProjectId");
+
+                    b.ToTable("CommercialOpeningReviews", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CommercialOpeningReview", "\"Revision\">=0 AND (\"CompletedAt\" IS NULL OR (\"CompletedAt\">=\"CreatedAt\" AND \"Declared\" AND \"DocumentId\" IS NOT NULL))");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningReviewMember", b =>
+                {
+                    b.Property<Guid>("ReviewId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Changed")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ChangedBySubject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool>("Completed")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("EvidenceVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Requested")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("ReviewId", "StructureId");
+
+                    b.HasIndex("ReviewId", "RoundId", "OpeningRecordId", "ProjectId");
+
+                    b.HasIndex("RoundId", "StructureId", "OpeningRecordId", "ProjectId");
+
+                    b.ToTable("CommercialOpeningReviewMembers", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CommercialOpeningReviewMember", "\"Revision\">=0 AND \"EvidenceVersion\">0 AND (NOT \"Completed\" OR (\"ChangedAt\" IS NOT NULL AND \"ChangedBySubject\" IS NOT NULL))");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningRound", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AdvisorSubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("FirstResponseAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LastActivityAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("PresentedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("SupersededAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OpeningRecordId")
+                        .IsUnique()
+                        .HasFilter("\"SupersededAt\" IS NULL");
+
+                    b.HasIndex("TaskId")
+                        .IsUnique();
+
+                    b.HasIndex("OpeningRecordId", "Number")
+                        .IsUnique();
+
+                    b.HasIndex("TaskId", "ProjectId");
+
+                    b.HasIndex("OpeningRecordId", "DocumentId", "ProjectId");
+
+                    b.ToTable("CommercialOpeningRounds", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CommercialOpeningRound", "\"Number\">0 AND \"Revision\">=0 AND \"LastActivityAt\">=\"ReceivedAt\" AND (\"PresentedAt\" IS NULL OR \"PresentedAt\">=\"ReceivedAt\") AND (\"FirstResponseAt\" IS NULL OR (\"PresentedAt\" IS NOT NULL AND \"FirstResponseAt\">=\"PresentedAt\")) AND (\"ResolvedAt\" IS NULL OR (\"FirstResponseAt\" IS NOT NULL AND \"ResolvedAt\">=\"FirstResponseAt\"))");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningRow", b =>
+                {
+                    b.Property<Guid>("RoundId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AcceptanceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Approval")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<Guid>("EvidenceDocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EvidenceVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OpeningRecordId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("RoundId", "StructureId");
+
+                    b.HasIndex("AcceptanceId", "OpeningRecordId", "ProjectId");
+
+                    b.HasIndex("OpeningRecordId", "EvidenceDocumentId", "ProjectId");
+
+                    b.HasIndex("OpeningRecordId", "StructureId", "ProjectId");
+
+                    b.HasIndex("RoundId", "OpeningRecordId", "ProjectId");
+
+                    b.ToTable("CommercialOpeningRows", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_CommercialOpeningRow", "\"EvidenceVersion\">0 AND \"Revision\">=0 AND \"Approval\" IN ('AwaitingApproval','Confirmed','UnderEngineeringReview') AND ((\"Approval\"='Confirmed' AND \"AcceptanceId\" IS NOT NULL) OR (\"Approval\"<>'Confirmed' AND \"AcceptanceId\" IS NULL))");
+                        });
+                });
+
             modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.EngineeringAssignedStructure", b =>
                 {
                     b.Property<Guid>("ProjectId")
@@ -3083,6 +3480,180 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("OpeningRecordId", "StructureId", "ProjectId")
                         .HasPrincipalKey("OpeningRecordId", "StructureId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningAcceptanceEvidence", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningAcceptanceMember", null)
+                        .WithMany()
+                        .HasForeignKey("AcceptanceId", "StructureId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningAcceptance", null)
+                        .WithMany()
+                        .HasForeignKey("AcceptanceId", "OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("Id", "OpeningRecordId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.CommercialOpeningDocumentMember", null)
+                        .WithMany()
+                        .HasForeignKey("SignedDocumentId", "StructureId", "RoundId", "OpeningRecordId", "ProjectId", "EvidenceVersion", "EvidenceDocumentId")
+                        .HasPrincipalKey("DocumentId", "StructureId", "RoundId", "OpeningRecordId", "ProjectId", "EvidenceVersion", "EvidenceDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningDocument", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningDocumentScope", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "DocumentId", "ProjectId")
+                        .HasPrincipalKey("OpeningRecordId", "DocumentId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.CommercialOpeningRound", null)
+                        .WithMany()
+                        .HasForeignKey("RoundId", "OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("Id", "OpeningRecordId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.CommercialOpeningReview", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewId", "RoundId", "OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("Id", "RoundId", "OpeningRecordId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningDocumentMember", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningDocumentScope", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "EvidenceDocumentId", "ProjectId")
+                        .HasPrincipalKey("OpeningRecordId", "DocumentId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.CommercialOpeningDocument", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentId", "RoundId", "OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("DocumentId", "RoundId", "OpeningRecordId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.CommercialOpeningRow", null)
+                        .WithMany()
+                        .HasForeignKey("RoundId", "StructureId", "OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("RoundId", "StructureId", "OpeningRecordId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningEvent", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.CommercialOpeningRound", null)
+                        .WithMany()
+                        .HasForeignKey("RoundId", "OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("Id", "OpeningRecordId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningReview", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.ProjectTask", null)
+                        .WithMany()
+                        .HasForeignKey("TaskId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningDocumentScope", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "DocumentId", "ProjectId")
+                        .HasPrincipalKey("OpeningRecordId", "DocumentId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.CommercialOpeningRound", null)
+                        .WithMany()
+                        .HasForeignKey("RoundId", "OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("Id", "OpeningRecordId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningReviewMember", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.CommercialOpeningReview", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewId", "RoundId", "OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("Id", "RoundId", "OpeningRecordId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.CommercialOpeningRow", null)
+                        .WithMany()
+                        .HasForeignKey("RoundId", "StructureId", "OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("RoundId", "StructureId", "OpeningRecordId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningRound", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.ProjectTask", null)
+                        .WithMany()
+                        .HasForeignKey("TaskId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningRoundLink", null)
+                        .WithMany()
+                        .HasForeignKey("Id", "OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("RoundId", "OpeningRecordId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningDocumentScope", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "DocumentId", "ProjectId")
+                        .HasPrincipalKey("OpeningRecordId", "DocumentId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.CommercialOpeningRow", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningAcceptance", null)
+                        .WithMany()
+                        .HasForeignKey("AcceptanceId", "OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("Id", "OpeningRecordId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningDocumentScope", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "EvidenceDocumentId", "ProjectId")
+                        .HasPrincipalKey("OpeningRecordId", "DocumentId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningRecordMember", null)
+                        .WithMany()
+                        .HasForeignKey("OpeningRecordId", "StructureId", "ProjectId")
+                        .HasPrincipalKey("OpeningRecordId", "StructureId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.CommercialOpeningRound", null)
+                        .WithMany()
+                        .HasForeignKey("RoundId", "OpeningRecordId", "ProjectId")
+                        .HasPrincipalKey("Id", "OpeningRecordId", "ProjectId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

@@ -140,7 +140,8 @@ public sealed class IncrementalFoundationTests
     [VerificationPostgresFact]
     public async Task NativeFoundationRepresentsMixedTranchesPartialAcceptancesAndIndependentFilingTasks()
     {
-        await using var db=await Database(); await db.Database.MigrateAsync();
+        // Seed the published Entrega 3 foundation, then prove Entrega 4 preserves it.
+        await using var db=await Database(); await db.GetService<IMigrator>().MigrateAsync("20261110184921_EnableIncrementalEngineering");
         var seed=await Seed(db,1); var project=seed.Project.Id; var canonicalRows=seed.Rows.Select(MeasurementStructureView.From).ToArray();
         var submissions=new List<MeasurementSubmission>();
         await using(var tx=await db.Database.BeginTransactionAsync())
@@ -215,6 +216,10 @@ public sealed class IncrementalFoundationTests
             INSERT INTO "SubmissionDocumentScopes" ("SubmissionId","ProjectId","DocumentId","Declaration")
             VALUES ({submissions[0].Id},{project},{presented.Id},'Late scope change')
             """));
+        var acceptedBefore=await db.Set<OpeningAcceptance>().AsNoTracking().OrderBy(x=>x.Id).Select(x=>new{x.Id,x.RoundId,x.SignedDocumentId,x.At}).ToArrayAsync();
+        await db.Database.MigrateAsync();
+        Assert.Equal(acceptedBefore,await db.Set<OpeningAcceptance>().AsNoTracking().OrderBy(x=>x.Id).Select(x=>new{x.Id,x.RoundId,x.SignedDocumentId,x.At}).ToArrayAsync());
+        Assert.Empty(await db.Set<CommercialOpeningRound>().Where(x=>x.ProjectId==project).ToArrayAsync());
         var countBefore=await db.Set<MeasurementSubmissionMember>().CountAsync();
         await Assert.ThrowsAsync<PostgresException>(()=>db.GetService<IMigrator>().MigrateAsync(Previous));
         Assert.Equal(countBefore,await db.Set<MeasurementSubmissionMember>().CountAsync());

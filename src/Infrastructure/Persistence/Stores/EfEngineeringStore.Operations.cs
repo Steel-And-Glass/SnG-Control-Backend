@@ -147,6 +147,8 @@ public sealed partial class EfEngineeringStore
                         var scope=await CoveredDocument(id,state.OpeningRecordId,state.CurrentDocumentId.Value,members,token);
                         var doc=await db.ProjectDocuments.AsNoTracking().SingleAsync(d=>d.Id==scope.DocumentId && d.ProjectId==id && d.IsEngineeringDocument,token);await VerifiedBytes(doc,scope.Sha256,token);
                         state.Confirm(at,actor.Subject,JsonSerializer.Serialize(new{Members=members.Select(Ref),Checks=checks,scope.DocumentId,scope.Version,scope.Sha256,ConfirmedAt=at,ConfirmedBy=actor.Subject}));
+                        var commercial=await EfCommercialOpeningStore.CreateInitialAsync(db,state,roles,at,token);
+                        added.AddRange(commercial.Entities);changedTasks.Add(commercial.Task);
                         var confirmed=await (from m in db.Set<ActiveOpeningRecordMember>() join a in db.Set<EngineeringOpeningState>() on m.OpeningRecordId equals a.OpeningRecordId where m.ProjectId==id && a.ConfirmedAt!=null select m.StructureId).ToArrayAsync(token);
                         var done=confirmed.Concat(ids).ToHashSet();
                         var packages=await db.Set<EngineeringPackage>().AsNoTracking().Where(p=>p.ProjectId==id && p.Status=="Open").ToArrayAsync(token);

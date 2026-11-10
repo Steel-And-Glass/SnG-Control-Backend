@@ -87,6 +87,8 @@ public static class DependencyInjection
         services.AddSingleton<SnG.Control.Application.Identity.IEngineeringAssigneeIdentity, ConfiguredEngineeringAssigneeIdentity>();
         services.AddScoped<SnG.Control.Application.Features.Engineering.EngineeringService>();
         services.AddScoped<SnG.Control.Application.Features.Engineering.EngineeringOperationsService>();
+        services.AddScoped<SnG.Control.Application.Features.Engineering.CommercialOpeningService>();
+        services.AddScoped<SnG.Control.Application.Features.Engineering.ICommercialOpeningStore, EfCommercialOpeningStore>();
         services.AddScoped<SnG.Control.Application.Features.Engineering.IEngineeringOperationsStore, EfEngineeringStore>();
         services.AddScoped<SnG.Control.Application.Features.Engineering.IEngineeringStore, EfEngineeringStore>();
         services.AddScoped<SnG.Control.Application.Features.Engineering.IOpeningRecordStore, EfOpeningRecordStore>();

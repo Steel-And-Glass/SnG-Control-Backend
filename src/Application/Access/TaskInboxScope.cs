@@ -23,6 +23,6 @@ public sealed record TaskInboxScope(string Subject, SystemRole? Role)
     public Expression<Func<ProjectTask, bool>> Filter()
     {
         if (Assignment is not { } assignment || string.IsNullOrWhiteSpace(Subject)) return task => false;
-        return task => task.Area == assignment.Area && (task.Type == assignment.Type || (Role == SystemRole.CommercialAdvisor && (task.Type == ProjectTaskType.CorrectDepositReceipts || task.Type == ProjectTaskType.PresentOpeningRecord)) || (Role == SystemRole.Engineering && (task.Type == ProjectTaskType.ReviewOpeningRecord || task.Type == ProjectTaskType.FileOpeningRecord))) && task.AssignedToGoogleSubject == Subject;
+        return task => task.Area == assignment.Area && (task.Type == assignment.Type || (Role == SystemRole.CommercialAdvisor && (task.Type == ProjectTaskType.CorrectDepositReceipts || task.Type == ProjectTaskType.PresentOpeningRecord)) || (Role == SystemRole.Engineering && (task.Type == ProjectTaskType.ReviewOpeningRecord || task.Type == ProjectTaskType.FileOpeningRecord || task.Type == ProjectTaskType.EngineeringPackage))) && task.AssignedToGoogleSubject == Subject;
     }
 }

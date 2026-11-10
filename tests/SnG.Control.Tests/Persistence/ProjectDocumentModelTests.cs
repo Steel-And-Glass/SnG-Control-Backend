@@ -34,8 +34,8 @@ public class ProjectDocumentModelTests
         Assert.Contains("1, 2, 3, 4, 5", notification.GetCheckConstraints().Single(c => c.Name == "CK_ProjectNotifications_Kind").Sql);
         Assert.Contains("\"Kind\" <> 4 AND \"State\" = 1", notification.GetCheckConstraints().Single(c => c.Name == "CK_ProjectNotifications_State").Sql);
         Assert.Equal(5, (int)NotificationKind.ProjectDocumentsUpdated);
-        Assert.Equal(27, db.Database.GetMigrations().Count());
-        Assert.EndsWith("EnableIncrementalEngineering", db.Database.GetMigrations().Last());
+        Assert.Equal(28, db.Database.GetMigrations().Count());
+        Assert.EndsWith("EnableIncrementalCommercialOpenings", db.Database.GetMigrations().Last());
         Assert.False(db.Database.HasPendingModelChanges());
     }
 }
