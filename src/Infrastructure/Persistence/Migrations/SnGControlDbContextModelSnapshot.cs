@@ -1888,6 +1888,253 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                     b.ToTable("OpeningFilingDeliveries", (string)null);
                 });
 
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningFilingDocument", b =>
+                {
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<int>("FileVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("LineageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("VersionId", "DocumentId");
+
+                    b.HasIndex("DocumentId", "ProjectId");
+
+                    b.HasIndex("VersionId", "LineageId")
+                        .IsUnique()
+                        .HasFilter("\"State\" = 'Current'");
+
+                    b.HasIndex("VersionId", "ProjectId");
+
+                    b.ToTable("OpeningFilingDocuments", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningFilingEvent", b =>
+                {
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("ActorSubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Canonical")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("FilingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("ProjectId", "RequestKey");
+
+                    b.HasIndex("FilingId", "ProjectId");
+
+                    b.ToTable("OpeningFilingEvents", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningFilingMember", b =>
+                {
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Confirmed")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("OpNormalized")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("OpOriginal")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("VersionId", "StructureId");
+
+                    b.HasIndex("StructureId", "ProjectId");
+
+                    b.HasIndex("VersionId", "OpNormalized")
+                        .IsUnique();
+
+                    b.HasIndex("VersionId", "ProjectId");
+
+                    b.ToTable("OpeningFilingMembers", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningFilingRelease", b =>
+                {
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Canonical")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("FilingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("VersionId");
+
+                    b.HasIndex("FilingId", "ProjectId");
+
+                    b.HasIndex("VersionId", "ProjectId");
+
+                    b.ToTable("OpeningFilingReleases", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningFilingVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ConfirmedBySubject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBySubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("FilingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ManifestCanonical")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ManifestSha256")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FilingId")
+                        .IsUnique()
+                        .HasFilter("\"ConfirmedAt\" IS NULL");
+
+                    b.HasIndex("FilingId", "Number")
+                        .IsUnique();
+
+                    b.HasIndex("FilingId", "ProjectId");
+
+                    b.ToTable("OpeningFilingVersions", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningFilingWorkspace", b =>
+                {
+                    b.Property<Guid>("FilingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("FirstConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NumberNormalized")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("NumberOriginal")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ResponsibleSubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.HasKey("FilingId");
+
+                    b.HasIndex("ProjectId", "NumberNormalized")
+                        .IsUnique()
+                        .HasFilter("\"NumberNormalized\" IS NOT NULL");
+
+                    b.ToTable("OpeningFilingWorkspaces", (string)null);
+                });
+
             modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3915,6 +4162,87 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                         .HasForeignKey("TaskId", "ProjectId")
                         .HasPrincipalKey("Id", "ProjectId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningFilingDocument", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.ProjectDocument", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningFilingVersion", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningFilingEvent", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningFilingWorkspace", null)
+                        .WithMany()
+                        .HasForeignKey("FilingId", "ProjectId")
+                        .HasPrincipalKey("FilingId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningFilingMember", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.MeasurementStructure", null)
+                        .WithMany()
+                        .HasForeignKey("StructureId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningFilingVersion", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningFilingRelease", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningFilingWorkspace", null)
+                        .WithMany()
+                        .HasForeignKey("FilingId", "ProjectId")
+                        .HasPrincipalKey("FilingId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningFilingVersion", null)
+                        .WithMany()
+                        .HasForeignKey("VersionId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningFilingVersion", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningFilingWorkspace", null)
+                        .WithMany()
+                        .HasForeignKey("FilingId", "ProjectId")
+                        .HasPrincipalKey("FilingId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningFilingWorkspace", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningFilingDelivery", null)
+                        .WithMany()
+                        .HasForeignKey("FilingId", "ProjectId")
+                        .HasPrincipalKey("Id", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SnG.Control.Domain.Entities.Incremental.OpeningRecord", b =>

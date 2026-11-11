@@ -36,7 +36,8 @@ public sealed partial class EfEngineeringStore
         EngineeringWork Work(Guid structureId,string? changedBy) {
             var package=workspace.Packages.Single(p=>p.Structures.Any(m=>m.StructureId==structureId));
             var acta=workspace.Actas.SingleOrDefault(a=>a.Structures.Any(m=>m.StructureId==structureId));
-            return new(package.Id,package.ResponsibleSubject,isTeam && package.ResponsibleSubject==scope.Subject && package.Status=="Open" && acta?.Status!="Confirmed",changedBy,acta?.Id);
+            var responsible=acta?.ResponsibleSubject ?? package.ResponsibleSubject;
+            return new(package.Id,responsible,isTeam && responsible==scope.Subject && (acta!=null || package.Status=="Open") && acta?.Status!="Confirmed",changedBy,acta?.Id);
         }
         var canModify=rows.Any(r=>Work(r.Check.StructureId,r.Check.ChangedBySubject).CanModify);
         // Reuse the same bounded-query delivery projection without opening a nested read transaction.
@@ -49,11 +50,20 @@ public sealed partial class EfEngineeringStore
     private async Task CheckIncrementalAsync(Guid id, Guid structureId, EngineeringCheck command, DecisionActor actor, CancellationToken token)
     {
         var tasks = await LockProject(id, token);
+        await RequireNative(id, actor, token);
         var task = tasks.SingleOrDefault(t => t.Type == ProjectTaskType.PrepareOpeningRecord);
         if (task == null || !engineering.Subjects.Contains(actor.Subject,StringComparer.Ordinal)) throw new DocumentException(403, "EngineeringAccessDenied");
         if (task.Status != ProjectTaskStatus.InProgress) throw new DocumentException(409, "EngineeringLocked");
         var row = await db.Set<EngineeringEvidenceCheck>().AsNoTracking().SingleOrDefaultAsync(c => c.ProjectId == id && c.StructureId == structureId && c.EvidenceVersion == 1, token) ?? throw new DocumentException(404, "EngineeringStructureNotFound");
-        if (!await (from m in db.Set<EngineeringAssignedStructure>() join a in db.Set<WorkPackageAssignment>() on m.AssignmentId equals a.Id join p in db.Set<EngineeringPackage>() on a.PackageId equals p.Id
+        // Only an exact member of an explicitly assigned Acta uses Acta authorization.
+        // Structures outside an Acta retain the original package ownership query below.
+        var acta = await (from member in db.Set<OpeningRecordMember>()
+            join reservation in db.Set<ActiveOpeningRecordMember>() on new { member.ProjectId, member.OpeningRecordId, member.StructureId } equals new { reservation.ProjectId, reservation.OpeningRecordId, reservation.StructureId }
+            join state in db.Set<EngineeringOpeningState>() on new { member.ProjectId, member.OpeningRecordId } equals new { state.ProjectId, state.OpeningRecordId }
+            where member.ProjectId == id && member.StructureId == structureId && member.SubmissionId == row.SubmissionId && member.EvidenceVersion == row.EvidenceVersion
+            select state).AsNoTracking().SingleOrDefaultAsync(token);
+        if (acta != null && acta.ResponsibleSubject != actor.Subject) throw new DocumentException(403, "EngineeringAccessDenied");
+        if (acta == null && !await (from m in db.Set<EngineeringAssignedStructure>() join a in db.Set<WorkPackageAssignment>() on m.AssignmentId equals a.Id join p in db.Set<EngineeringPackage>() on a.PackageId equals p.Id
             where m.ProjectId==id && m.StructureId==structureId && m.SubmissionId==row.SubmissionId && a.Subject==actor.Subject && a.EndedAt==null && p.Status=="Open" select m).AnyAsync(token)) throw new DocumentException(403,"EngineeringAccessDenied");
         var fingerprint = Fingerprint(new { structureId, command });
         var replay = await db.Set<EngineeringCheckEvent>().AsNoTracking().SingleOrDefaultAsync(e => e.ProjectId == id && e.RequestKey == command.RequestKey, token);

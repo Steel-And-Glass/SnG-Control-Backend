@@ -88,6 +88,10 @@ public static class DependencyInjection
         services.AddScoped<SnG.Control.Application.Features.Engineering.EngineeringService>();
         services.AddScoped<SnG.Control.Application.Features.Engineering.EngineeringOperationsService>();
         services.AddScoped<SnG.Control.Application.Features.Engineering.CommercialOpeningService>();
+        services.AddScoped<SnG.Control.Application.Features.Engineering.OpeningFilingService>();
+        services.AddOptions<SnG.Control.Application.Features.Engineering.OpeningFilingLimits>().BindConfiguration("OpeningFiling")
+            .Validate(o => o.MaxFileBytes > 0 && o.MaxFileBytes <= EfEngineeringStore.MaxPdfBytes && o.MaxProjectStorageBytes >= o.MaxFileBytes, "Invalid OpeningFiling storage limits.").ValidateOnStart();
+        services.AddScoped<SnG.Control.Application.Features.Engineering.IOpeningFilingStore, EfOpeningFilingStore>();
         services.AddScoped<SnG.Control.Application.Features.Engineering.ICommercialOpeningStore, EfCommercialOpeningStore>();
         services.AddScoped<SnG.Control.Application.Features.Engineering.IEngineeringOperationsStore, EfEngineeringStore>();
         services.AddScoped<SnG.Control.Application.Features.Engineering.IEngineeringStore, EfEngineeringStore>();

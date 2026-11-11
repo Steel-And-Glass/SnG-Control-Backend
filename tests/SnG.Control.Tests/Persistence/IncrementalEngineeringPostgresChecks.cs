@@ -23,7 +23,7 @@ internal static class IncrementalEngineeringPostgresChecks
         async Task<EngineeringCommandResult> Run(EngineeringCommand c,DecisionActor? a=null) {await using var db=open();return await Store(db).ExecuteAsync(id,c,a??actor,default);}
         async Task Check(Guid structure,long revision,DecisionActor a,bool completed=true){await using var db=open();await Store(db).CheckAsync(id,structure,new(Guid.NewGuid(),revision,completed),a,default);}
         async Task Error(string code,Func<Task> f)=>Assert.Equal(code,(await Assert.ThrowsAsync<DocumentException>(f)).Code);
-        EngineeringCommand Command(string action,long revision,Guid? target=null,string? subject=null,IReadOnlyList<EngineeringReference>? refs=null,Guid? doc=null)=>new(Guid.NewGuid(),revision,action,target,subject,refs,doc);
+        EngineeringCommand Command(string action,long revision,Guid? target=null,string? subject=null,IReadOnlyList<EngineeringReference>? refs=null,Guid? doc=null)=>new(Guid.NewGuid(),revision,action,target,action=="CreateActa"?subject??actor.Subject:subject,refs,doc);
         EngineeringReference Reference(EngineeringRow r)=>new(r.Structure.Id,r.Origin!.SubmissionId,r.Origin.EvidenceVersion);
         var before=await Read();var w=before.Workspace!;Assert.Equal(4,w.Packages.Count);Assert.Empty(w.Actas);
         var refs=new[]{Reference(before.Structures.Single(r=>r.Completed)),Reference(before.Structures[3]),Reference(before.Structures[4]),Reference(before.Structures[7])};
@@ -34,10 +34,10 @@ internal static class IncrementalEngineeringPostgresChecks
         Assert.False(workerState.Workspace!.CanManagePackages);Assert.Empty(workerState.Workspace.AssignableSubjects);
         await Error("EngineeringAccessDenied",()=>Check(refs[0].StructureId,1,actor));
         await Error("EngineeringAssignmentConflict",()=>Run(create with{RequestKey=Guid.NewGuid(),ExpectedRevision=workerState.Workspace.Revision}));
-        var actaCommand=Command("CreateActa",workerState.Workspace.Revision,refs:refs);
-        var acta=await Run(actaCommand,worker);Assert.Equal(acta,await Run(actaCommand,worker));
-        await Error("EngineeringSourceInvalid",async ()=>await Run(actaCommand with{RequestKey=Guid.NewGuid(),ExpectedRevision=(await Read()).Workspace!.Revision,Structures=[refs[0] with{EvidenceVersion=2}]},worker));
-        await Error("EngineeringStructureReserved",async ()=>await Run(actaCommand with{RequestKey=Guid.NewGuid(),ExpectedRevision=(await Read()).Workspace!.Revision},worker));
+        var actaCommand=Command("CreateActa",workerState.Workspace.Revision,subject:worker.Subject,refs:refs);
+        var acta=await Run(actaCommand);Assert.Equal(acta,await Run(actaCommand));
+        await Error("EngineeringSourceInvalid",async ()=>await Run(actaCommand with{RequestKey=Guid.NewGuid(),ExpectedRevision=(await Read()).Workspace!.Revision,Structures=[refs[0] with{EvidenceVersion=2}]} ));
+        await Error("EngineeringStructureReserved",async ()=>await Run(actaCommand with{RequestKey=Guid.NewGuid(),ExpectedRevision=(await Read()).Workspace!.Revision}));
         await Error("EngineeringStructureReserved",()=>Run(Command("ReassignPackage",0,package.TargetId,actor.Subject)));
         await Error("EngineeringActaRequired",()=>Run(Command("ConfirmActa",0,acta.TargetId),worker));
         await Error("EngineeringAccessDenied",()=>Run(Command("ConfirmActa",0,acta.TargetId)));
@@ -78,7 +78,7 @@ internal static class IncrementalEngineeringPostgresChecks
         Assert.Equal("Completed",state.Workspace.Packages.Single(p=>p.Id==package.TargetId).Status);Assert.Equal("InProgress",state.TaskStatus);
         Assert.NotEqual("Confirmed",state.Workspace.Actas.Single(a=>a.Id==second.TargetId).Status);
         await Error("EngineeringLocked",()=>Run(Command("AddStructures",current.Revision,acta.TargetId,refs:[Reference(before.Structures[4])]),worker));
-        await Error("EngineeringAccessDenied",()=>Check(refs[0].StructureId,1,worker,false));
+        await Error("EngineeringLocked",()=>Check(refs[0].StructureId,1,worker,false));
         await Error("EngineeringLocked",()=>UploadActa(acta.TargetId,Guid.NewGuid(),current.Revision,current.ScopeHash,worker));
         await using var verify=open();
         var download=await Store(verify).DownloadOpeningAsync(id,acta.TargetId,firstDoc,new(worker.Subject,SystemRole.Engineering),default);using var output=new MemoryStream();await download.Content.CopyToAsync(output);Assert.Equal(pdf,output.ToArray());await download.Content.DisposeAsync();
@@ -108,6 +108,22 @@ internal static class IncrementalEngineeringPostgresChecks
         var uploads=await Task.WhenAll(ConcurrentUpload("first-race.pdf"),ConcurrentUpload("second-race.pdf"));Assert.Single(uploads,s=>s==200);Assert.Single(uploads,s=>s==409);
         Assert.Single((await Read()).Workspace!.Actas.Single(a=>a.Id==raced.Id).Documents);
         await Error("EngineeringSourceInvalid",()=>Run(Command("CreateActa",state.Workspace.Revision,refs:[new(Guid.NewGuid(),Guid.NewGuid(),1)])));
+        // Acta assignment is independent of package ownership, and cannot escape its exact members.
+        raced=(await Read()).Workspace!.Actas.Single(a=>a.Id==raced.Id);
+        var assignment=Command("AssignActa",raced.Revision,raced.Id,worker.Subject);
+        await Error("EngineeringAccessDenied",()=>Run(assignment,worker));
+        await Run(assignment);
+        await Error("EngineeringAccessDenied",()=>Check(before.Structures[6].Structure.Id,0,actor));
+        await Check(before.Structures[6].Structure.Id,0,worker);
+        await Error("EngineeringAccessDenied",()=>Check(before.Structures[5].Structure.Id,1,worker));
+        await Error("EngineeringAccessDenied",()=>Run(Command("SelectDocument",0,second.TargetId,doc:firstDoc),worker));
+        raced=(await Read()).Workspace!.Actas.Single(a=>a.Id==raced.Id);
+        await Run(Command("AssignActa",raced.Revision,raced.Id,actor.Subject));
+        await Error("EngineeringAccessDenied",()=>Check(before.Structures[6].Structure.Id,1,worker));
+        await Check(before.Structures[6].Structure.Id,1,actor);
+        Assert.Equal(actor.Subject,(await Read()).Workspace!.Packages.Single(p=>p.Id==third.TargetId).ResponsibleSubject);
+        current=(await Read()).Workspace!.Actas.Single(a=>a.Id==acta.TargetId);
+        await Error("EngineeringLocked",()=>Run(Command("AssignActa",current.Revision,current.Id,actor.Subject)));
         await IncrementalCommercialOpeningPostgresChecks.VerifyAsync(open,id,storage,timing,pdf);
 
     }

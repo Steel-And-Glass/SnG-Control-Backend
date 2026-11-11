@@ -43,7 +43,7 @@ public sealed partial class EfEngineeringStore
                 var complete=ids.Count>0 && ids.All(i=>checks.Any(c=>c.StructureId==i && c.Completed));
                 var ready=complete && documents.Any(d=>d.File.Document.Id==s.CurrentDocumentId && d.MatchesManifest);
                 var status=s.ConfirmedAt!=null?"Confirmed":ready?"Ready":ids.Any(i=>checks.Any(c=>c.StructureId==i && c.Completed))?"InProgress":"Draft";
-                var canModify=isTeam && s.ResponsibleSubject==scope.Subject && s.ConfirmedAt==null && ids.All(i=>claims.Any(c=>c.StructureId==i && assignments.Any(x=>x.Id==c.AssignmentId && x.Subject==scope.Subject && x.EndedAt==null)));
+                var canModify=isTeam && s.ResponsibleSubject==scope.Subject && s.ConfirmedAt==null;
                 return new EngineeringActaView(a.Id,a.Number,status,s.ResponsibleSubject,s.CreatedBySubject,a.CreatedAt,s.Revision,canModify,Ordered(mm.Select(Ref)),ScopeHash(mm),s.CurrentDocumentId,documents,s.ConfirmedAt,s.ConfirmedBySubject);
             }).ToArray(),history.Select(e=>new EngineeringWorkspaceHistory(e.Action,e.TargetId,e.Revision,e.At,e.ActorSubject)).ToArray());
     }

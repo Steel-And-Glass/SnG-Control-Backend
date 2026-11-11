@@ -19,16 +19,25 @@ public sealed class IncrementalEngineeringContractTests
         public Task<DocumentDownload> DownloadOpeningAsync(Guid id,Guid actaId,Guid documentId,ProjectReadScope scope,CancellationToken token)=>throw new NotSupportedException();
     }
     private static ConfiguredEngineeringAssigneeIdentity Team()=>new(Options.Create(new EngineeringAssigneeOptions{EngineeringAssigneeSubject="coordinator",EngineeringWorkerSubjects=["worker-one","worker-two"]}));
-    private static EngineeringCommand Create()=>new(Guid.NewGuid(),0,"CreateActa",null,null,[new(Guid.NewGuid(),Guid.NewGuid(),1)],null);
+    private static EngineeringCommand Create()=>new(Guid.NewGuid(),0,"CreateActa",null,"worker-one",[new(Guid.NewGuid(),Guid.NewGuid(),1)],null);
     [Theory]
     [InlineData(SystemRole.Management,"worker-one")]
     [InlineData(SystemRole.Engineering,"unknown")]
     [InlineData(SystemRole.CommercialAdvisor,"coordinator")]
     public async Task RoleAndConfiguredSubjectRequired(SystemRole role,string subject)
     {var store=new Store();var service=new EngineeringOperationsService(store,new IdentityDouble(subject),new TestRole(role),Team());var error=await Assert.ThrowsAsync<DocumentException>(()=>service.ExecuteAsync(Guid.NewGuid(),Create(),default));Assert.Equal(403,error.Status);Assert.Equal(0,store.Calls);}
-    [Fact]
-    public async Task WorkerMayCreateActaButOnlyCoordinatorAssignsPackages()
-    {var store=new Store();var service=new EngineeringOperationsService(store,new IdentityDouble("worker-one"),new TestRole(SystemRole.Engineering),Team());var command=Create();await service.ExecuteAsync(Guid.NewGuid(),command,default);var error=await Assert.ThrowsAsync<DocumentException>(()=>service.ExecuteAsync(Guid.NewGuid(),command with{Action="CreatePackage",Subject="worker-two"},default));Assert.Equal(403,error.Status);Assert.Equal(1,store.Calls);}
+    [Theory]
+    [InlineData("CreateActa")]
+    [InlineData("AssignActa")]
+    public async Task OnlyConfiguredHeadCanAssignActas(string action)
+    {
+        var store=new Store();var c=action=="CreateActa"?Create():Create() with{Action=action,TargetId=Guid.NewGuid(),Structures=null};
+        var worker=new EngineeringOperationsService(store,new IdentityDouble("worker-one"),new TestRole(SystemRole.Engineering),Team());
+        Assert.Equal(403,(await Assert.ThrowsAsync<DocumentException>(()=>worker.ExecuteAsync(Guid.NewGuid(),c,default))).Status);
+        Assert.Equal(0,store.Calls);
+        var head=new EngineeringOperationsService(store,new IdentityDouble("coordinator"),new TestRole(SystemRole.Engineering),Team());
+        await head.ExecuteAsync(Guid.NewGuid(),c,default);Assert.Equal(1,store.Calls);
+    }
     [Fact]
     public async Task RejectsUnknownActionsForeignShapeDuplicatesAndUnboundedSelections()
     {var store=new Store();var service=new EngineeringOperationsService(store,new IdentityDouble("coordinator"),new TestRole(SystemRole.Engineering),Team());var c=Create();foreach(var invalid in new[]{c with{Action="CommercialConfirm"},c with{Subject="unexpected"},c with{Structures=[]},c with{Structures=[c.Structures![0],c.Structures[0]]},c with{Structures=Enumerable.Range(0,501).Select(_=>new EngineeringReference(Guid.NewGuid(),Guid.NewGuid(),1)).ToArray()},c with{Structures=[c.Structures![0] with{EvidenceVersion=2}]},c with{Action="CreatePackage",Subject="not-configured"},c with{RequestKey=Guid.Empty}}){var error=await Assert.ThrowsAsync<DocumentException>(()=>service.ExecuteAsync(Guid.NewGuid(),invalid,default));Assert.Equal(400,error.Status);}Assert.Equal(0,store.Calls);}

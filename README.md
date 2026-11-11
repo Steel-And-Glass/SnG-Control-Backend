@@ -482,7 +482,7 @@ Solicitar cambios exige seleccionar estructuras pendientes y describir cada camb
 
 Ingeniería trabaja checks independientes de su checklist inicial, sobre las estructuras observadas y las adicionales que declare afectadas. Debe declarar explícitamente todas las afectadas, completar sus checks y cargar un nuevo PDF asociado a esa declaración. No se analizan ni infieren cambios internos del PDF. Al cerrar se congela la revisión y se crea otra ronda comercial: las afectadas vuelven a Esperando aprobación; las confirmaciones de estructuras sin cambios se conservan con su versión de origen.
 
-Aceptar definitivamente exige todas las estructuras Confirmadas, un PDF firmado persistido en la ronda vigente y la declaración explícita del asesor de que está firmado y corresponde al Acta presentada. El sistema conserva esa declaración; no verifica criptográficamente firmas ni deduce correspondencia por nombre. La aceptación congela la ronda, completa Comercial y crea una única «Radicación de Vanos» asignada a Ingeniería, pendiente y sin SLA. Conserva las referencias a radicación original, documentos presentado/firmado y estructuras aprobadas. Su ejecución no está implementada y la aceptación no autoriza fabricar. «Detener proyecto» permanece deshabilitado.
+Aceptar definitivamente exige todas las estructuras Confirmadas, un PDF firmado persistido en la ronda vigente y la declaración explícita del asesor de que está firmado y corresponde al Acta presentada. El sistema conserva esa declaración; no verifica criptográficamente firmas ni deduce correspondencia por nombre. La aceptación congela la ronda, completa Comercial y crea una única «Radicación de Vanos» asignada a Ingeniería, pendiente y sin SLA. Conserva las referencias a radicación original, documentos presentado/firmado y estructuras aprobadas. El circuito historico conserva la consulta; la ejecucion incremental se describe en Radicacion de Vanos. La aceptacion no autoriza fabricar. «Detener proyecto» permanece deshabilitado.
 
 Los expedientes anteriores se habilitan solo mediante el procedimiento controlado del manual técnico; no reciben tareas por backfill automático.
 
@@ -507,7 +507,7 @@ Sin corte configurado se mantiene el circuito tradicional. No se aplica retroact
 Cada entrega conserva IDs, alcance documental, hashes, actor y PDF A3 de tres estructuras por pagina.
 Solo sus estructuras quedan congeladas; pueden medirse otras y agregarse nuevas.
 Ingenieria permite recepcion y checks por estructura; las Actas/cierre/presentacion comercial
-incrementales siguen bloqueados. No hay enmiendas operativas ni Radicacion de Vanos en esta entrega.
+incrementales siguen bloqueados. Las enmiendas de medidas siguen pendientes; Radicacion de Vanos dispone del expediente incremental descrito abajo.
 
 
 ## Ingenieria incremental y multiples Actas (Entrega 3)
@@ -649,3 +649,40 @@ pendientes entre rondas, resolucion, idempotencia y freeze SQL. La prueba de fun
 publicado anterior y comprueba aceptaciones intactas tras actualizar; las regresiones historicas tambien
 conservan IDs/snapshots/PDFs/estados. HTTP valida rol activo, atestacion, limites y multipart cerrado.
 Desplegar coordinadamente Backend + Frontend. No aplicar migraciones a la base operativa sin autorizacion.
+
+
+## Radicacion de Vanos: expediente por aceptacion
+
+Cada aceptacion incremental firmada conserva una sola `OpeningFilingDelivery` y su tarea
+`FileOpeningRecord`. El expediente puede prepararse en varias sesiones, confirmarse y recibir
+una enmienda versionada; confirmar una entrega no cierra el proyecto ni otras tareas.
+
+El Jefe configurado en `Authentication:EngineeringAssigneeSubject` crea cada Acta indicando
+explicitamente un Subject del equipo y puede reasignarla mientras no este confirmada. La
+asignacion registra actor, fecha, responsable anterior y nuevo. Dentro del Acta, su responsable
+revisa exclusivamente sus integrantes, aunque procedan de paquetes ajenos. Fuera de ella se
+conserva la autorizacion por paquete. Agregar nuevos integrantes sigue exigiendo acceso al
+paquete de origen. La aceptacion hereda el responsable acreditado del Acta para la radicacion.
+No hay reasignacion automatica de historicos ni modificaciones ordinarias de Actas confirmadas.
+
+Las siete categorias obligatorias (Lista de Estructuras, Secciones, Planos, Lista de Corte No
+Optimizada, Vidrios, Materiales, Modulacion de Vidrios) admiten varios PDF cada una. Adicionales
+es opcional y tambien admite varios PDF. En esta entrega la allowlist es exclusivamente PDF:
+los validadores XLSX de cotizacion no son validadores generales de anexos y no se habilitan
+XLS/XLSX/CSV sin una validacion documental apropiada. La inspeccion PDF existente comprueba
+formato, encabezado y xref; no certifica contenido tecnico, firmas ni ausencia de malware.
+Los archivos privados se descargan como adjuntos, con hash y tamano verificados.
+
+El numero de radicado se ingresa manualmente, conserva original y normalizado y es unico
+**dentro del proyecto**, incluidos expedientes confirmados. El OP conserva ambos valores,
+se asocia al ID fisico permanente y es unico por version del expediente. Normalizacion:
+ASCII acotado a 80 caracteres, trim, eliminacion de espacios y uppercase; no se extraen
+ni inventan codigos. La confirmacion exige todos los integrantes exactos de la aceptacion,
+OP confirmados y al menos un PDF vigente por categoria obligatoria.
+
+Carga, sustitucion y retiro se auditan sin borrar bytes historicos. Una enmienda exige motivo,
+conserva identidad y numero, clona referencias a los archivos vigentes sin copiar bytes y
+crea otra version. La entrega original permanece inmutable y descargable.
+
+Los expedientes historicos sin evidencia completa conservan su consulta y bloqueo
+`LEGACY_INCOMPLETE_EVIDENCE`; no hay backfill, PDFs regenerados ni radicaciones ficticias.

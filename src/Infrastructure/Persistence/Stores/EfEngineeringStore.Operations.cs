@@ -27,9 +27,9 @@ public sealed partial class EfEngineeringStore
     {
         var state=await db.Set<EngineeringOpeningState>().AsNoTracking().SingleOrDefaultAsync(s=>s.ProjectId==id && s.OpeningRecordId==acta,token) ?? throw new DocumentException(404,"EngineeringActaNotFound");
         if(state.ResponsibleSubject!=actor.Subject) throw new DocumentException(403,"EngineeringAccessDenied");
-        var ids=await db.Set<OpeningRecordMember>().Where(m=>m.ProjectId==id && m.OpeningRecordId==acta).Select(m=>m.StructureId).ToArrayAsync(token);
-        var owned=await (from m in db.Set<EngineeringAssignedStructure>() join a in db.Set<WorkPackageAssignment>() on m.AssignmentId equals a.Id where m.ProjectId==id && ids.Contains(m.StructureId) && a.Subject==actor.Subject select m.StructureId).CountAsync(token);
-        if(owned!=ids.Length) throw new DocumentException(403,"EngineeringAccessDenied");
+        // Explicit Acta assignment owns this Acta only. Selected() still enforces package
+        // ownership when adding new structures that are not already members of the Acta.
+        await RequireNative(id, actor, token);
         return state;
     }
     private async Task<MeasurementSubmissionMember[]> Selected(Guid id,IReadOnlyList<EngineeringReference> refs,DecisionActor actor,bool coordinator,CancellationToken token)
@@ -57,10 +57,15 @@ public sealed partial class EfEngineeringStore
     {
         await using var tx=await db.Database.BeginTransactionAsync(token);
         var tasks=await LockProject(id,token); await RequireNative(id,actor,token);
+        if(c.Action is "CreateActa" or "AssignActa" &&
+            (actor.Subject!=engineering.Subject || !engineering.Subjects.Contains(c.Subject!,StringComparer.Ordinal)))
+            throw new DocumentException(403,"EngineeringAccessDenied");
+        // Recheck ownership before accepting an idempotent replay after reassignment.
+        if(c.Action is "AddStructures" or "SelectDocument" or "ConfirmActa") await OwnedActa(id,c.TargetId!.Value,actor,token);
         var fingerprint=Fingerprint(c); var old=await WorkspaceReplay(id,c.RequestKey,fingerprint,actor,token);
         if(old!=null) return new(old.TargetId);
         var at=timing.UtcNow; var added=new List<object>(); var touched=new List<object>(); var changedTasks=new List<ProjectTask>();
-        Guid target; long revision;
+        Guid target; long revision; string? previousActaSubject=null;
         EfProjectNotificationWriter.NotificationWriteSet? staged=null;
         try
         {
@@ -117,19 +122,22 @@ public sealed partial class EfEngineeringStore
                 if(c.Action=="CreateActa")
                 {
                     var workspace=await db.Set<EngineeringWorkspace>().AsNoTracking().SingleAsync(w=>w.ProjectId==id,token);Revision(workspace.Revision,c.ExpectedRevision);
-                    var selected=await Selected(id,c.Structures!,actor,false,token);
+                    var selected=await Selected(id,c.Structures!,actor,true,token);
                     var number=(await db.Set<OpeningRecord>().Where(a=>a.ProjectId==id).MaxAsync(a=>(int?)a.Number,token) ?? 0)+1;
-                    var acta=new OpeningRecord(Guid.NewGuid(),id,number,at,null,IncrementalEvidence.Complete);state=new(acta,actor.Subject);
+                    var acta=new OpeningRecord(Guid.NewGuid(),id,number,at,null,IncrementalEvidence.Complete);state=new(acta,c.Subject!,actor.Subject);
                     added.AddRange([acta,state]);db.Attach(workspace);touched.Add(workspace);workspace.Advance();
                     added.AddRange(selected.Select((m,i)=>new OpeningRecordMember(acta.Id,id,m.StructureId,m.SubmissionId,m.EvidenceVersion,i)));
                     added.AddRange(selected.Select(m=>new ActiveOpeningRecordMember(acta.Id,id,m.StructureId)));
                 }
                 else
                 {
-                    state=await OwnedActa(id,c.TargetId!.Value,actor,token);
+                    state=c.Action=="AssignActa"
+                        ? await db.Set<EngineeringOpeningState>().AsNoTracking().SingleOrDefaultAsync(a=>a.ProjectId==id && a.OpeningRecordId==c.TargetId,token) ?? throw new DocumentException(404,"EngineeringActaNotFound")
+                        : await OwnedActa(id,c.TargetId!.Value,actor,token);
                     if(state.ConfirmedAt!=null) throw new DocumentException(409,"EngineeringLocked");Revision(state.Revision,c.ExpectedRevision);
                     db.Attach(state);touched.Add(state);var members=await Members(id,state.OpeningRecordId,token);
-                    if(c.Action=="AddStructures")
+                    if(c.Action=="AssignActa") { previousActaSubject=state.ResponsibleSubject; state.Assign(c.Subject!); }
+                    else if(c.Action=="AddStructures")
                     {
                         var selected=await Selected(id,c.Structures!,actor,false,token);
                         // Existing immutable positions stay stable; display ordering uses the original source keys.
@@ -166,7 +174,7 @@ public sealed partial class EfEngineeringStore
                 }
                 target=state.OpeningRecordId;revision=state.Revision;
             }
-            added.Add(new EngineeringWorkspaceEvent(id,c.RequestKey,fingerprint,c.Action,target,revision,at,actor.Subject,JsonSerializer.Serialize(c)));
+            added.Add(new EngineeringWorkspaceEvent(id,c.RequestKey,fingerprint,c.Action,target,revision,at,actor.Subject,c.Action=="AssignActa"?JsonSerializer.Serialize(new{Command=c,PreviousSubject=previousActaSubject}):JsonSerializer.Serialize(c)));
             db.AddRange(added);if(changedTasks.Count>0) staged=await notifications.StageAsync(changedTasks,at,token);
             await db.SaveChangesAsync(token);await tx.CommitAsync(token);return new(target);
         }

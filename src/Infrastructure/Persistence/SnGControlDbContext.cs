@@ -65,6 +65,7 @@ public class SnGControlDbContext(DbContextOptions<SnGControlDbContext> options) 
         modelBuilder.ApplyConfiguration(new InitialDepositConfiguration());
         modelBuilder.ApplyConfiguration(new RequotationRequestConfiguration());
         modelBuilder.ApplyConfiguration(new ClientQuotationDecisionConfiguration());
+        OpeningFilingConfiguration.Configure(modelBuilder);
         modelBuilder.ApplyConfiguration(new ClientConfiguration());
         modelBuilder.ApplyConfiguration(new ProjectConfiguration());
         modelBuilder.ApplyConfiguration(new ProjectTaskConfiguration());

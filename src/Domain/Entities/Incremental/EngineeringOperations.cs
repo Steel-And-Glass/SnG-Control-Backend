@@ -42,8 +42,8 @@ public sealed class EngineeringAssignedStructure
 public sealed class EngineeringOpeningState
 {
     private EngineeringOpeningState() { }
-    public EngineeringOpeningState(OpeningRecord acta, string subject)
-    { MeasurementChecklist.ValidateActor(acta.CreatedAt,subject); OpeningRecordId=acta.Id; ProjectId=acta.ProjectId; ResponsibleSubject=subject; CreatedBySubject=subject; }
+    public EngineeringOpeningState(OpeningRecord acta, string subject, string? createdBy = null)
+    { MeasurementChecklist.ValidateActor(acta.CreatedAt,subject); MeasurementChecklist.ValidateActor(acta.CreatedAt,createdBy ?? subject); OpeningRecordId=acta.Id; ProjectId=acta.ProjectId; ResponsibleSubject=subject; CreatedBySubject=createdBy ?? subject; }
     public Guid OpeningRecordId { get; private set; }
     public Guid ProjectId { get; private set; }
     public string ResponsibleSubject { get; private set; } = "";
@@ -55,6 +55,7 @@ public sealed class EngineeringOpeningState
     public string? ConfirmationCanonical { get; private set; }
     public string? ConfirmationSha256 { get; private set; }
     public void Advance() { if(ConfirmedAt!=null) throw new InvalidOperationException("Acta confirmed."); Revision=checked(Revision+1); }
+    public void Assign(string subject) { MeasurementChecklist.ValidateActor(DateTime.UnixEpoch,subject); Advance(); ResponsibleSubject=subject; }
     public void SetDocument(Guid documentId) { if(documentId==Guid.Empty) throw new ArgumentException("Document required."); Advance(); CurrentDocumentId=documentId; }
     public void Confirm(DateTime at,string subject,string canonical)
     { MeasurementChecklist.ValidateActor(at,subject); if(subject!=ResponsibleSubject || CurrentDocumentId==null) throw new InvalidOperationException("Invalid confirmation."); IncrementalEvidence.Json(canonical); Advance(); ConfirmedAt=at; ConfirmedBySubject=subject; ConfirmationCanonical=canonical; ConfirmationSha256=IncrementalEvidence.Hash(canonical); }

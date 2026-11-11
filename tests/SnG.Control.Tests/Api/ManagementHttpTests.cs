@@ -191,6 +191,8 @@ public class ManagementHttpTests(ApiFixture fixture) : IClassFixture<ApiFixture>
         }
         Assert.True(document.GetProperty("paths").GetProperty("/api/projects/{id}/measurements/submissions/{submissionId}/report").TryGetProperty("get", out _));
         Assert.True(document.GetProperty("paths").GetProperty("/api/projects/{id}/measurements/submissions").TryGetProperty("post", out _));
-        Assert.Equal(71, document.GetProperty("paths").EnumerateObject().Sum(p => p.Value.EnumerateObject().Count(o => o.Name is "get" or "post" or "put" or "delete")));
+        foreach (var operation in new[] { ("/api/projects/{id}/opening-filings", "get"), ("/api/projects/{id}/opening-filings/{filingId}/commands", "post"), ("/api/projects/{id}/opening-filings/{filingId}/documents", "post"), ("/api/projects/{id}/opening-filings/{filingId}/versions/{versionId}/documents/{documentId}/download", "get") })
+            Assert.True(document.GetProperty("paths").GetProperty(operation.Item1).TryGetProperty(operation.Item2, out _));
+        Assert.Equal(75, document.GetProperty("paths").EnumerateObject().Sum(p => p.Value.EnumerateObject().Count(o => o.Name is "get" or "post" or "put" or "delete")));
     }
 }

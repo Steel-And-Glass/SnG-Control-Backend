@@ -33,13 +33,14 @@ public sealed class EngineeringOperationsService(IEngineeringOperationsStore sto
         var valid=c.Action switch {
             "CreatePackage" => selection && c.TargetId==null && c.DocumentId==null && identity.Subjects.Contains(c.Subject ?? "",StringComparer.Ordinal),
             "ReassignPackage" => target && c.Structures==null && c.DocumentId==null && identity.Subjects.Contains(c.Subject ?? "",StringComparer.Ordinal),
-            "CreateActa" => selection && c.TargetId==null && c.Subject==null && c.DocumentId==null,
+            "CreateActa" => selection && c.TargetId==null && identity.Subjects.Contains(c.Subject ?? "",StringComparer.Ordinal) && c.DocumentId==null,
+            "AssignActa" => target && c.Structures==null && c.DocumentId==null && identity.Subjects.Contains(c.Subject ?? "",StringComparer.Ordinal),
             "AddStructures" => target && selection && c.Subject==null && c.DocumentId==null,
             "SelectDocument" => target && c.Structures==null && c.Subject==null && c.DocumentId is {} d && d!=Guid.Empty,
             "ConfirmActa" => target && c.Structures==null && c.Subject==null && c.DocumentId==null,
             _ => false };
         if(c.RequestKey==Guid.Empty || c.ExpectedRevision<0 || !valid) throw new DocumentException(400,"InvalidEngineeringCommand");
-        if(c.Action is "CreatePackage" or "ReassignPackage" && current.Subject!=identity.Subject) throw new DocumentException(403,"EngineeringAccessDenied");
+        if(c.Action is "CreatePackage" or "ReassignPackage" or "CreateActa" or "AssignActa" && current.Subject!=identity.Subject) throw new DocumentException(403,"EngineeringAccessDenied");
         return store.ExecuteAsync(id,c,Actor,token);
     }
     public Task UploadAsync(Guid id,Guid actaId,Guid key,long revision,string scopeHash,IAsyncEnumerable<DocumentUpload> uploads,CancellationToken token)
