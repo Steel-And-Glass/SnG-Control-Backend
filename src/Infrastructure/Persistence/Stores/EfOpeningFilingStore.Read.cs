@@ -37,7 +37,7 @@ public sealed partial class EfOpeningFilingStore
                 original.Where(m => m.OpeningRecordId == x.a.OpeningRecordId && source.Contains(m.StructureId)).Select(m => new OpeningFilingSource(m.StructureId, m.SubmissionId, m.EvidenceVersion, JsonSerializer.Deserialize<MeasurementStructureView>(m.SnapshotCanonical)!)).ToArray(),
                 vv.Select(v => new OpeningFilingVersionView(v.Id, v.Number, v.Reason, v.CreatedAt, v.CreatedBySubject, v.ConfirmedAt, v.ConfirmedBySubject, v.ManifestSha256,
                     members.Where(m => m.VersionId == v.Id).Select(m => new OpeningFilingOp(m.StructureId, m.OpOriginal, m.Confirmed)).ToArray(),
-                    docs.Where(d => d.l.VersionId == v.Id).Select(d => new OpeningFilingDocumentView(d.d.Id, d.l.Category, d.l.FileVersion, d.l.State, d.d.OriginalFileName, d.d.SizeBytes, d.l.Sha256, d.d.UploadedAt, d.d.UploadedByGoogleSubject)).ToArray())).ToArray(),
+                    docs.Where(d => d.l.VersionId == v.Id).Select(d => new OpeningFilingDocumentView(d.d.Id, d.l.Category, d.l.FileVersion, d.l.State, d.d.OriginalFileName, d.d.SizeBytes, d.l.Sha256, d.d.UploadedAt, d.d.UploadedByGoogleSubject, d.d.ContentType)).ToArray())).ToArray(),
                 events.Where(e => e.FilingId == x.d.Id).Select(e => new OpeningFilingHistory(e.Action, e.At, e.ActorSubject)).ToArray());
         }).ToArray());
     }

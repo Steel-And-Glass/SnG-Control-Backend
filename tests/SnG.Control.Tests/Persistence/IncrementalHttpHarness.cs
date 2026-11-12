@@ -40,6 +40,8 @@ internal sealed class IncrementalHttpHarness : IAsyncDisposable
     public IStreamingFileStorage Files => app.Services.GetRequiredService<IStreamingFileStorage>();
     // Test-only replacement of the effective startup membership. Production IOptions is not hot-reloaded.
     public void SetAdvisorMembership(params string[] subjects) => app.Services.GetRequiredService<IOptions<SnG.Control.Api.Authorization.CommercialAdvisorOptions>>().Value.CommercialAdvisorSubjects = subjects;
+    public void SetFilingLimits(long fileBytes,long projectBytes)
+    { var limits=app.Services.GetRequiredService<IOptions<SnG.Control.Application.Features.Engineering.OpeningFilingLimits>>().Value;limits.MaxFileBytes=fileBytes;limits.MaxProjectStorageBytes=projectBytes; }
     public static async Task<IncrementalHttpHarness> Start() { var h = new IncrementalHttpHarness(); await h.Initialize(); return h; }
     private async Task Initialize()
     {

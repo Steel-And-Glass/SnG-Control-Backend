@@ -21,5 +21,5 @@ public sealed class OpeningFilingController(OpeningFilingService service) : Cont
     { service.RequireWrite(); var upload = await OpeningFilingMultipartReader.OpenAsync(Request, token); await service.UploadAsync(id, filingId, upload.Manifest, upload.Files, token); return NoContent(); }
     [HttpGet("{filingId:guid}/versions/{versionId:guid}/documents/{documentId:guid}/download")]
     public async Task<IActionResult> Download(Guid id, Guid filingId, Guid versionId, Guid documentId, CancellationToken token)
-    { var file = await service.DownloadAsync(id, filingId, versionId, documentId, token); Response.Headers["X-Content-Type-Options"] = "nosniff"; return File(file.Content, "application/pdf", file.FileName); }
+    { var file = await service.DownloadAsync(id, filingId, versionId, documentId, token); Response.Headers["X-Content-Type-Options"] = "nosniff"; return File(file.Content, file.ContentType, file.FileName); }
 }

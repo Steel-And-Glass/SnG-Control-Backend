@@ -130,7 +130,7 @@ public sealed partial class EfOpeningFilingStore(SnGControlDbContext db, TaskTim
         if (members.Length == 0 || members.Any(m => !m.Confirmed) || !accepted.ToHashSet().SetEquals(members.Select(m => m.StructureId))) throw Conflict("OpeningFilingIncomplete");
         var docs = await (from link in db.Set<OpeningFilingDocument>().AsNoTracking() join doc in db.ProjectDocuments.AsNoTracking() on link.DocumentId equals doc.Id where link.VersionId == v.Id && link.State == "Current" && doc.ProjectId == w.ProjectId select new { link, doc }).OrderBy(x => x.link.Category).ThenBy(x => x.doc.Id).ToArrayAsync(token);
         if (OpeningFilingRules.Categories.Take(7).Any(c => !docs.Any(d => d.link.Category == c))) throw Conflict("OpeningFilingIncomplete");
-        foreach (var d in docs) await Verified(d.doc, d.link.Sha256, token);
+        foreach (var d in docs) await Verified(d.doc, d.link.Sha256, token, d.link.Category != "Additional");
         foreach (var documentId in new[] { acceptance.PresentedDocumentId, acceptance.SignedDocumentId }.Distinct())
         {
             var scope = await db.Set<OpeningDocumentScope>().AsNoTracking().SingleOrDefaultAsync(s => s.DocumentId == documentId && s.ProjectId == w.ProjectId && s.OpeningRecordId == acceptance.OpeningRecordId, token) ?? throw Conflict("OpeningFilingEvidenceIncomplete");
@@ -140,7 +140,7 @@ public sealed partial class EfOpeningFilingStore(SnGControlDbContext db, TaskTim
         var at = timing.UtcNow;
         var manifest = Json(new { w.ProjectId, w.FilingId, AcceptanceId = acceptance.Id, acceptance.OpeningRecordId, acceptance.PresentedDocumentId, acceptance.SignedDocumentId,
             VersionId = v.Id, v.Number, w.NumberOriginal, w.NumberNormalized, w.ResponsibleSubject, Structures = members, Evidence = evidence,
-            Documents = docs.Select(d => new { d.doc.Id, d.doc.OriginalFileName, d.doc.SizeBytes, d.link.Category, d.link.FileVersion, d.link.Sha256 }), At = at, Actor = actor.Subject, Consumers = new[] { "Production", "Logistics" } });
+            Documents = docs.Select(d => new { d.doc.Id, d.doc.OriginalFileName, d.doc.ContentType, d.doc.SizeBytes, d.link.Category, d.link.FileVersion, d.link.Sha256 }), At = at, Actor = actor.Subject, Consumers = new[] { "Production", "Logistics" } });
         if (v.Number == 1)
         {
             if (task.Status is not (ProjectTaskStatus.Pending or ProjectTaskStatus.InProgress)) throw Conflict("OpeningFilingLocked");
@@ -150,14 +150,14 @@ public sealed partial class EfOpeningFilingStore(SnGControlDbContext db, TaskTim
         else if (task.Status != ProjectTaskStatus.Completed) throw Conflict();
         v.Confirm(at, actor.Subject, manifest); w.Confirm(at); db.Add(new OpeningFilingRelease(v));
     }
-    private async Task<byte[]> Verified(ProjectDocument doc, string hash, CancellationToken token)
+    private async Task<byte[]> Verified(ProjectDocument doc, string hash, CancellationToken token, bool pdf = true)
     {
         try
         {
         await using var stream = await files.OpenReadAsync(doc.StorageKey, token);
         var bytes = await EfEngineeringStore.ReadBounded(stream, token);
         if (bytes.LongLength != doc.SizeBytes || Hash(bytes) != hash) throw Conflict("OpeningFilingDocumentInvalid");
-        EfEngineeringStore.ValidatePdf(doc.OriginalFileName, bytes); return bytes;
+        if (pdf) EfEngineeringStore.ValidatePdf(doc.OriginalFileName, bytes); return bytes;
         }
         catch (FileNotFoundException) { throw Conflict("OpeningFilingDocumentInvalid"); }
         catch (DirectoryNotFoundException) { throw Conflict("OpeningFilingDocumentInvalid"); }

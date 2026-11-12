@@ -2158,9 +2158,12 @@ No hay reasignacion automatica de historicos ni modificaciones ordinarias de Act
 
 Las siete categorias obligatorias (Lista de Estructuras, Secciones, Planos, Lista de Corte No
 Optimizada, Vidrios, Materiales, Modulacion de Vidrios) admiten varios PDF cada una. Adicionales
-es opcional y tambien admite varios PDF. En esta entrega la allowlist es exclusivamente PDF:
-los validadores XLSX de cotizacion no son validadores generales de anexos y no se habilitan
-XLS/XLSX/CSV sin una validacion documental apropiada. La inspeccion PDF existente comprueba
+es opcional y admite multiples archivos de cualquier formato, sin allowlist de extensiones.
+Los adicionales se almacenan como bytes opacos: no se ejecutan, descomprimen ni interpretan.
+Se conserva el nombre original completo (incluida su extension), MIME declarado cuando existe,
+tamano, SHA-256, responsable y fecha, con el mismo versionado y auditoria. El MIME es metadata
+no confiable: se descargan autenticados como application/octet-stream, attachment y nosniff.
+Las siete categorias obligatorias conservan su validacion PDF. Esta inspeccion comprueba
 formato, encabezado y xref; no certifica contenido tecnico, firmas ni ausencia de malware.
 Los archivos privados se descargan como adjuntos, con hash y tamano verificados.
 
@@ -2193,7 +2196,7 @@ Los consumidores futuros deben fijar VersionId; una enmienda no reemplaza su ent
 API bajo `/api/projects/{id}/opening-filings`:
 - GET: todos los expedientes e historiales autorizados del proyecto.
 - POST `{filingId}/commands`: Save, Withdraw, Confirm, Amend, con RequestKey y ExpectedRevision.
-- POST `{filingId}/documents`: multipart cerrado (manifest JSON y un PDF por request); multiples
+- POST `{filingId}/documents`: multipart cerrado (manifest JSON y un archivo por request); multiples
   archivos de la UI se transmiten progresivamente sin limite funcional por tarjeta.
 - GET `{filingId}/versions/{versionId}/documents/{documentId}/download`: descarga privada versionada.
 
@@ -2205,6 +2208,6 @@ numero confirmado, eventos y documentos historicos. El filesystem usa compensaci
 el rollback es conocido; ante resultado incierto del commit conserva archivos para el replay.
 
 Limites tecnicos configurables: `OpeningFiling:MaxFileBytes` (default 26214400, maximo del lector
-PDF existente) y `OpeningFiling:MaxProjectStorageBytes` (default 2147483648). La cuota cuenta bytes
+existente) y `OpeningFiling:MaxProjectStorageBytes` (default 2147483648). La cuota cuenta bytes
 fisicos historicos una sola vez; no hay un numero maximo de archivos por categoria o radicaciones.
 El servidor sigue siendo autoridad; un 409 exige recargar sin reintentar writes automaticamente.

@@ -14,8 +14,8 @@ internal static class OpeningFilingHttpChecks
         async Task Send(Guid id,OpeningFilingCommand c,int status=204,string actor="worker",string role="Engineering")
         {using var r=await h.Send(actor,role,HttpMethod.Post,h.Path($"opening-filings/{id}/commands"),c);await IncrementalHttpHarness.Status(r,status);}
         OpeningFilingCommand Command(OpeningFilingView f,string action)=>new(Guid.NewGuid(),f.Revision,action,null,null,null,null);
-        async Task Upload(OpeningFilingView f,string category,Guid? previous=null,int status=204,byte[]? bytes=null,string name="technical.pdf",Guid? key=null)
-        {using var form=new MultipartFormDataContent();form.Add(JsonContent.Create(new OpeningFilingUpload(key??Guid.NewGuid(),f.Revision,category,previous),options:IncrementalHttpHarness.Json),"manifest");var file=new ByteArrayContent(bytes??pdf);file.Headers.ContentType=new("application/pdf");form.Add(file,"file",name);using var r=await h.Send("worker","Engineering",HttpMethod.Post,h.Path($"opening-filings/{f.Id}/documents"),form);await IncrementalHttpHarness.Status(r,status);}
+        async Task Upload(OpeningFilingView f,string category,Guid? previous=null,int status=204,byte[]? bytes=null,string name="technical.pdf",Guid? key=null,string? mime="application/pdf")
+        {using var form=new MultipartFormDataContent();form.Add(JsonContent.Create(new OpeningFilingUpload(key??Guid.NewGuid(),f.Revision,category,previous),options:IncrementalHttpHarness.Json),"manifest");var file=new ByteArrayContent(bytes??pdf);if(mime!=null)file.Headers.ContentType=new(mime);form.Add(file,"file",name);using var r=await h.Send("worker","Engineering",HttpMethod.Post,h.Path($"opening-filings/{f.Id}/documents"),form);await IncrementalHttpHarness.Status(r,status);}
         async Task Download(Guid filing,Guid version,Guid document,int status=200,string actor="worker",string role="Engineering")
         {using var r=await h.Send(actor,role,HttpMethod.Get,h.Path($"opening-filings/{filing}/versions/{version}/documents/{document}/download"));await IncrementalHttpHarness.Status(r,status);if(status==200)Assert.Equal(pdf,await r.Content.ReadAsByteArrayAsync());}
         var all=await Read();Assert.Equal(4,all.Filings.Count);Assert.All(all.Filings,f=>{Assert.Equal("Pending",f.Status);Assert.Equal("worker",f.ResponsibleSubject);Assert.True(f.CanModify);Assert.Empty(f.Versions);});
@@ -38,6 +38,33 @@ internal static class OpeningFilingHttpChecks
         var extra=first.Versions[0].Documents.First(d=>d.State=="Current").DocumentId;
         await Send(first.Id,Command(first,"Withdraw") with{DocumentId=extra});first=await Filing(first.Id);Assert.Contains(first.Versions[0].Documents,d=>d.State=="Withdrawn");await Download(first.Id,v1,extra);
         foreach(var category in OpeningFilingRules.Categories.Take(7).Where(c=>c!="Sections")){await Upload(first,category);first=await Filing(first.Id);}
+        // Additional files are opaque: arbitrary extension, active MIME, no MIME and disguised PDF.
+        var additions = new[] { ("script.HTML", "text/html", "<script>never execute</script>"u8.ToArray()), ("drawing.custom-format", "application/x-custom", new byte[]{0,255,1,2}), ("without-extension", (string?)null, new byte[]{77,90,3}), ("opaque.pdf", "application/pdf", new byte[]{9,8,7}) };
+        foreach(var (name,mime,bytes) in additions)
+        {
+            await Upload(first,"Additional",bytes:bytes,name:name,mime:mime);first=await Filing(first.Id);
+            var saved=first.Versions[0].Documents.Single(d=>d.Name==name);
+            Assert.Equal(mime,saved.ContentType);Assert.Equal(bytes.Length,saved.SizeBytes);Assert.Equal("worker",saved.UploadedBySubject);
+            Assert.Equal(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)),saved.Sha256);
+            using var response=await h.Send("worker","Engineering",HttpMethod.Get,h.Path($"opening-filings/{first.Id}/versions/{v1}/documents/{saved.DocumentId}/download"));
+            await IncrementalHttpHarness.Status(response,200);Assert.Equal(bytes,await response.Content.ReadAsByteArrayAsync());Assert.Equal("application/octet-stream",response.Content.Headers.ContentType!.MediaType);
+            Assert.Equal("attachment",response.Content.Headers.ContentDisposition!.DispositionType);Assert.Equal("nosniff",Assert.Single(response.Headers.GetValues("X-Content-Type-Options")));Assert.True(response.Headers.CacheControl!.NoStore);
+            await Download(first.Id,v1,saved.DocumentId,403,"other-advisor","CommercialAdvisor");
+        }
+        var originalAdditional=first.Versions[0].Documents.Single(d=>d.Name=="script.HTML");
+        await Upload(first,"Additional",originalAdditional.DocumentId,bytes:[7,6,5],name:"replacement.exe",mime:"application/x-msdownload");first=await Filing(first.Id);
+        Assert.Equal("Replaced",first.Versions[0].Documents.Single(d=>d.DocumentId==originalAdditional.DocumentId).State);
+        Assert.Equal(2,first.Versions[0].Documents.Single(d=>d.Name=="replacement.exe").Version);
+        using(var historic=await h.Send("worker","Engineering",HttpMethod.Get,h.Path($"opening-filings/{first.Id}/versions/{v1}/documents/{originalAdditional.DocumentId}/download"))) {await IncrementalHttpHarness.Status(historic,200);Assert.Equal(additions[0].Item3,await historic.Content.ReadAsByteArrayAsync());}
+        foreach(var category in OpeningFilingRules.Categories.Take(7)) await Upload(first,category,status:400,bytes:[1,2,3],name:"not-a-pdf.html",mime:"text/html");
+        await Upload(first,"Additional",status:400,bytes:[],name:"empty.bin",mime:null);
+        await Upload(first,"Additional",status:400,bytes:[1],name:"../escape.bin",mime:null);
+        h.SetFilingLimits(8,2L*1024*1024*1024);
+        try { await Upload(first,"Additional",status:413,bytes:new byte[9],name:"large.bin",mime:null); }
+        finally { h.SetFilingLimits(25*1024*1024,2L*1024*1024*1024); }
+        h.SetFilingLimits(8,8);
+        try { await Upload(first,"Additional",status:413,bytes:[1],name:"quota.bin",mime:null); }
+        finally { h.SetFilingLimits(25*1024*1024,2L*1024*1024*1024); }
         var confirm=Command(first,"Confirm");await Task.WhenAll(Send(first.Id,confirm),Send(first.Id,confirm));first=await Filing(first.Id);Assert.Equal("Confirmed",first.Status);Assert.NotNull(first.Versions[0].ManifestSha256);
         await Upload(first,"Additional",status:409);await Send(first.Id,Command(first,"Save") with{Number="changed",Members=save.Members},409);
         await using(var db=h.Db())

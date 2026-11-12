@@ -14,7 +14,8 @@ public sealed class OpeningFilingLimits
 public sealed record OpeningFilingOp(Guid StructureId, string Code, bool Confirmed);
 public sealed record OpeningFilingCommand(Guid RequestKey, long ExpectedRevision, string Action, string? Number, IReadOnlyList<OpeningFilingOp>? Members, Guid? DocumentId, string? Reason);
 public sealed record OpeningFilingUpload(Guid RequestKey, long ExpectedRevision, string Category, Guid? ReplacesDocumentId);
-public sealed record OpeningFilingDocumentView(Guid DocumentId, string Category, int Version, string State, string Name, long SizeBytes, string Sha256, DateTime UploadedAt, string UploadedBySubject);
+public sealed record OpeningFilingDocumentView(Guid DocumentId, string Category, int Version, string State, string Name, long SizeBytes, string Sha256, DateTime UploadedAt, string UploadedBySubject, string? ContentType);
+public sealed record OpeningFilingDownload(Stream Content, string FileName, string ContentType);
 public sealed record OpeningFilingVersionView(Guid Id, int Number, string? Reason, DateTime CreatedAt, string CreatedBySubject, DateTime? ConfirmedAt, string? ConfirmedBySubject, string? ManifestSha256, IReadOnlyList<OpeningFilingOp> Members, IReadOnlyList<OpeningFilingDocumentView> Documents);
 public sealed record OpeningFilingSource(Guid StructureId, Guid SubmissionId, int EvidenceVersion, SnG.Control.Application.Features.Measurements.MeasurementStructureView Source);
 public sealed record OpeningFilingHistory(string Action, DateTime At, string ActorSubject);
@@ -25,7 +26,7 @@ public interface IOpeningFilingStore
     Task<OpeningFilingsView?> ReadAsync(Guid id, ProjectReadScope scope, CancellationToken token);
     Task CommandAsync(Guid id, Guid filingId, OpeningFilingCommand command, DecisionActor actor, CancellationToken token);
     Task UploadAsync(Guid id, Guid filingId, OpeningFilingUpload manifest, IAsyncEnumerable<DocumentUpload> uploads, DecisionActor actor, CancellationToken token);
-    Task<DocumentDownload> DownloadAsync(Guid id, Guid filingId, Guid versionId, Guid documentId, ProjectReadScope scope, CancellationToken token);
+    Task<OpeningFilingDownload> DownloadAsync(Guid id, Guid filingId, Guid versionId, Guid documentId, ProjectReadScope scope, CancellationToken token);
 }
 public sealed class OpeningFilingService(IOpeningFilingStore store, ICurrentUser current, IActiveRoleContext active, IEngineeringAssigneeIdentity engineering)
 {
@@ -55,5 +56,5 @@ public sealed class OpeningFilingService(IOpeningFilingStore store, ICurrentUser
             throw new DocumentException(400, "InvalidOpeningFilingCommand");
         return store.UploadAsync(id, filingId, manifest, uploads, Actor, token);
     }
-    public Task<DocumentDownload> DownloadAsync(Guid id, Guid filingId, Guid versionId, Guid documentId, CancellationToken token) => store.DownloadAsync(id, filingId, versionId, documentId, new(current.Subject, active.Role), token);
+    public Task<OpeningFilingDownload> DownloadAsync(Guid id, Guid filingId, Guid versionId, Guid documentId, CancellationToken token) => store.DownloadAsync(id, filingId, versionId, documentId, new(current.Subject, active.Role), token);
 }
