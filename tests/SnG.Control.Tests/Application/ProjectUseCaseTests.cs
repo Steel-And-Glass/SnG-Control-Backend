@@ -22,7 +22,7 @@ public class ProjectUseCaseTests
             .ExecuteAsync(client.Id, "Project", "City", ProductLine.Classic, default);
         var entity = Assert.Single(projects.Items);
         Assert.Equal(subject, entity.CreatedByGoogleSubject); Assert.Equal(email, entity.CreatedByEmail); Assert.Equal(name, entity.CreatedByName);
-        Assert.Equal(subject, response!.CreatedBy!.Subject); Assert.Equal(email, response.CreatedBy.Email); Assert.Equal(name, response.CreatedBy.Name);
+        Assert.Equal(name, response!.CreatedByName); Assert.True(response.IsCreatedByMe);
     }
 
     [Theory]

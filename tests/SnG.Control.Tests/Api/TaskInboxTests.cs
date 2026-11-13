@@ -55,7 +55,8 @@ public class TaskInboxTests(MultiRoleFixture fixture) : IClassFixture<MultiRoleF
             var task = Assert.Single(rows!, t => t.GetProperty("projectId").GetGuid() == project.Id);
             Assert.Equal(expected[role], task.GetProperty("id").GetGuid());
             var history = await http.GetFromJsonAsync<JsonElement[]>($"/api/projects/{project.Id}/tasks");
-            Assert.Equal(historyIds, history!.Select(t => t.GetProperty("id").GetGuid()).Order());
+            var expectedHistory = role == "Budgets" ? fixture.Tasks.Items.Where(t => t.ProjectId == project.Id && t.Area == OperationalArea.Budgets).Select(t => t.Id).Order().ToArray() : historyIds;
+            Assert.Equal(expectedHistory, history!.Select(t => t.GetProperty("id").GetGuid()).Order());
         }
         Assert.Equal(before, JsonSerializer.Serialize(new { project, fixture.Tasks.Items }));
     }

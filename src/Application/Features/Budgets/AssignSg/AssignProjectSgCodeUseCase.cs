@@ -32,6 +32,6 @@ public class AssignProjectSgCodeUseCase(IBudgetsWorkflowStore store, TaskTiming 
         }
 
         return new AssignProjectSgCodeResult.Success(new AssignProjectSgCodeResponse(
-            ProjectResponse.FromEntity(project), ProjectTaskResponse.FromEntity(task, timing)));
+            ProjectResponse.FromEntity(project, user.Subject), ProjectTaskResponse.FromEntity(task, timing)));
     }
 }

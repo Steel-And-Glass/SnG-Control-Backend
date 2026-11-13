@@ -3092,6 +3092,664 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.DocumentExtractionJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ComponentRevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ErrorCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("EventsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("ExtractorVersion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Generation")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<Guid?>("LeaseToken")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PreparationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReextractReason")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("ReportJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RequestedBySubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComponentRevisionId", "PreparationId");
+
+                    b.HasIndex("PreparationId", "ExtractorVersion", "Generation")
+                        .IsUnique();
+
+                    b.ToTable("DocumentExtractionJobs", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ExtractionJob_Lease", "(\"State\"=2 AND \"LeaseToken\" IS NOT NULL AND \"LeaseUntil\" IS NOT NULL) OR (\"State\"<>2 AND \"LeaseToken\" IS NULL AND \"LeaseUntil\" IS NULL)");
+
+                            t.HasCheckConstraint("CK_ExtractionJob_State", "\"State\" IN (1,2,3,4,5) AND \"Attempts\" BETWEEN 0 AND 3 AND \"Revision\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.PreparationSourceDocument", b =>
+                {
+                    b.Property<Guid>("PreparationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<Guid>("ReleaseVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("PreparationId", "DocumentId");
+
+                    b.HasIndex("PreparationId", "ReleaseVersionId");
+
+                    b.HasIndex("ReleaseVersionId", "DocumentId");
+
+                    b.ToTable("PreparationSourceDocuments", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.PreparationSourceMember", b =>
+                {
+                    b.Property<Guid>("PreparationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Op")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<Guid>("ReleaseVersionId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("PreparationId", "StructureId");
+
+                    b.HasIndex("PreparationId", "Op")
+                        .IsUnique();
+
+                    b.HasIndex("PreparationId", "ReleaseVersionId");
+
+                    b.HasIndex("ReleaseVersionId", "StructureId");
+
+                    b.ToTable("PreparationSourceMembers", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionApproval", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Canonical")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("PreparationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ReviewId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Revision")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PreparationId")
+                        .IsUnique();
+
+                    b.HasIndex("ReviewId")
+                        .IsUnique();
+
+                    b.HasIndex("ReviewId", "PreparationId");
+
+                    b.ToTable("ProductionApprovals", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionCandidateRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ComponentRevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CoordinatesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<decimal?>("CutDimension")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("DeclaredMaterial")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("DiagnosticsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DocumentSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ExtractorVersion")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal?>("Height")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("LeftAngle")
+                        .HasColumnType("numeric");
+
+                    b.Property<int?>("Material")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("Measure")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Op")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("OriginalDimensions")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("OriginalPieceId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int?>("Page")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PreparationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("ProposedRoute")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<decimal?>("RightAngle")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Sheet")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SourceRow")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SpecificationsJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TemplateVersion")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal?>("Width")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ComponentRevisionId", "PreparationId");
+
+                    b.HasIndex("PreparationId", "DocumentId", "DocumentSha256");
+
+                    b.HasIndex("PreparationId", "StructureId", "Op");
+
+                    b.ToTable("ProductionCandidateRows", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Candidate_Page", "\"Page\" IS NULL OR \"Page\" > 0");
+
+                            t.HasCheckConstraint("CK_Candidate_Quantity", "\"Quantity\" IS NULL OR \"Quantity\" > 0");
+
+                            t.HasCheckConstraint("CK_Candidate_Route", "((\"Material\" IS NULL AND \"ProposedRoute\" IS NULL) OR (\"Material\" = 1 AND \"ProposedRoute\" = 1) OR (\"Material\" IN (2,3) AND \"ProposedRoute\" = 2)) IS TRUE");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionComponentRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBySubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PreparationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReviewedBySubject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PreparationId", "Number")
+                        .IsUnique();
+
+                    b.ToTable("ProductionComponentRevisions", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ComponentRevision_Number", "\"Number\" > 0 AND \"Revision\" >= 0");
+
+                            t.HasCheckConstraint("CK_ComponentRevision_State", "\"State\" IN (1,2,3,4)");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionPreparation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBySubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ExtractorVersion")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("FilingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ManifestSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ReleaseVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReviewedBySubject")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReleaseVersionId")
+                        .IsUnique();
+
+                    b.HasIndex("FilingId", "ProjectId");
+
+                    b.ToTable("ProductionPreparations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProductionPreparation_Revision", "\"Revision\" >= 0");
+
+                            t.HasCheckConstraint("CK_ProductionPreparation_State", "\"State\" IN (1,2,3,4)");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBySubject")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<long>("DataRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("ExtractionJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PreparationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("SourceRevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExtractionJobId")
+                        .IsUnique();
+
+                    b.HasIndex("ExtractionJobId", "PreparationId");
+
+                    b.HasIndex("PreparationId", "Number")
+                        .IsUnique();
+
+                    b.HasIndex("SourceRevisionId", "PreparationId");
+
+                    b.ToTable("ProductionReviews", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Review_State", "\"State\" IN (1,2,3) AND \"Revision\" >= 0 AND \"DataRevision\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionReviewAttachment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ContentType")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<Guid>("PreparationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Sha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<long>("SizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PreparationId", "RequestKey")
+                        .IsUnique();
+
+                    b.ToTable("ProductionReviewAttachments", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ReviewAttachment_Size", "\"SizeBytes\" > 0 AND \"SizeBytes\" <= 26214400");
+                        });
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionReviewEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Actor")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("At")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DetailJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("PreparationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<Guid>("RequestKey")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ResultJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("ReviewId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PreparationId", "RequestKey")
+                        .IsUnique();
+
+                    b.HasIndex("ReviewId", "PreparationId");
+
+                    b.ToTable("ProductionReviewEvents", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionReviewIssue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("EvidenceJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<long?>("ResolvedDataRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("ReviewId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReviewId");
+
+                    b.ToTable("ProductionReviewIssues", (string)null);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionReviewRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CandidateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DocumentSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<bool>("Excluded")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Op")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("OriginalJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("PreparationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ReviewId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Reviewed")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("StructureId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ValuesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CandidateId", "PreparationId");
+
+                    b.HasIndex("ReviewId", "CandidateId")
+                        .IsUnique();
+
+                    b.HasIndex("ReviewId", "PreparationId");
+
+                    b.HasIndex("PreparationId", "DocumentId", "DocumentSha256");
+
+                    b.HasIndex("PreparationId", "StructureId", "Op");
+
+                    b.ToTable("ProductionReviewRows", (string)null);
+                });
+
             modelBuilder.Entity("SnG.Control.Domain.Entities.Project", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4585,6 +5243,193 @@ namespace SnG.Control.Infrastructure.Persistence.Migrations
                     b.HasOne("SnG.Control.Domain.Entities.MeasurementStructure", null)
                         .WithMany()
                         .HasForeignKey("StructureId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.DocumentExtractionJob", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Production.ProductionPreparation", null)
+                        .WithMany()
+                        .HasForeignKey("PreparationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Production.ProductionComponentRevision", null)
+                        .WithMany()
+                        .HasForeignKey("ComponentRevisionId", "PreparationId")
+                        .HasPrincipalKey("Id", "PreparationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.PreparationSourceDocument", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Production.ProductionPreparation", null)
+                        .WithMany()
+                        .HasForeignKey("PreparationId", "ReleaseVersionId")
+                        .HasPrincipalKey("Id", "ReleaseVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningFilingDocument", null)
+                        .WithMany()
+                        .HasForeignKey("ReleaseVersionId", "DocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.PreparationSourceMember", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Production.ProductionPreparation", null)
+                        .WithMany()
+                        .HasForeignKey("PreparationId", "ReleaseVersionId")
+                        .HasPrincipalKey("Id", "ReleaseVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningFilingMember", null)
+                        .WithMany()
+                        .HasForeignKey("ReleaseVersionId", "StructureId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionApproval", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Production.ProductionReview", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewId", "PreparationId")
+                        .HasPrincipalKey("Id", "PreparationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionCandidateRow", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Production.ProductionComponentRevision", null)
+                        .WithMany()
+                        .HasForeignKey("ComponentRevisionId", "PreparationId")
+                        .HasPrincipalKey("Id", "PreparationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Production.PreparationSourceDocument", null)
+                        .WithMany()
+                        .HasForeignKey("PreparationId", "DocumentId", "DocumentSha256")
+                        .HasPrincipalKey("PreparationId", "DocumentId", "Sha256")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Production.PreparationSourceMember", null)
+                        .WithMany()
+                        .HasForeignKey("PreparationId", "StructureId", "Op")
+                        .HasPrincipalKey("PreparationId", "StructureId", "Op")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionComponentRevision", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Production.ProductionPreparation", null)
+                        .WithMany()
+                        .HasForeignKey("PreparationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionPreparation", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningFilingRelease", null)
+                        .WithMany()
+                        .HasForeignKey("ReleaseVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Incremental.OpeningFilingWorkspace", null)
+                        .WithMany()
+                        .HasForeignKey("FilingId", "ProjectId")
+                        .HasPrincipalKey("FilingId", "ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionReview", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Production.ProductionPreparation", null)
+                        .WithMany()
+                        .HasForeignKey("PreparationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Production.DocumentExtractionJob", null)
+                        .WithMany()
+                        .HasForeignKey("ExtractionJobId", "PreparationId")
+                        .HasPrincipalKey("Id", "PreparationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Production.ProductionComponentRevision", null)
+                        .WithMany()
+                        .HasForeignKey("SourceRevisionId", "PreparationId")
+                        .HasPrincipalKey("Id", "PreparationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionReviewAttachment", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Production.ProductionPreparation", null)
+                        .WithMany()
+                        .HasForeignKey("PreparationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionReviewEvent", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Production.ProductionReview", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewId", "PreparationId")
+                        .HasPrincipalKey("Id", "PreparationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionReviewIssue", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Production.ProductionReview", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SnG.Control.Domain.Entities.Production.ProductionReviewRow", b =>
+                {
+                    b.HasOne("SnG.Control.Domain.Entities.Production.ProductionCandidateRow", null)
+                        .WithMany()
+                        .HasForeignKey("CandidateId", "PreparationId")
+                        .HasPrincipalKey("Id", "PreparationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SnG.Control.Domain.Entities.Production.ProductionReview", null)
+                        .WithMany()
+                        .HasForeignKey("ReviewId", "PreparationId")
+                        .HasPrincipalKey("Id", "PreparationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Production.PreparationSourceDocument", null)
+                        .WithMany()
+                        .HasForeignKey("PreparationId", "DocumentId", "DocumentSha256")
+                        .HasPrincipalKey("PreparationId", "DocumentId", "Sha256")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SnG.Control.Domain.Entities.Production.PreparationSourceMember", null)
+                        .WithMany()
+                        .HasForeignKey("PreparationId", "StructureId", "Op")
+                        .HasPrincipalKey("PreparationId", "StructureId", "Op")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

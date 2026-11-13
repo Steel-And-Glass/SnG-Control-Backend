@@ -10,5 +10,6 @@ public enum SystemRole
     Production = 6,
     Logistics = 7,
     Installation = 8,
-    Management = 9
+    Management = 9,
+    OperationsHead = 10
 }

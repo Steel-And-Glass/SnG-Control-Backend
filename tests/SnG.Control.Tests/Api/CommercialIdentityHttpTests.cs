@@ -103,8 +103,8 @@ public class CommercialIdentityHttpTests(ApiFixture fixture) : IClassFixture<Api
         using var created = await fixture.Http.PostAsJsonAsync("/api/projects", new { clientId = client.Id, name = "Project", city = "City", productLine = "Classic" });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var result = await created.Content.ReadFromJsonAsync<JsonElement>(); var id = result.GetProperty("id").GetGuid();
-        var creator = result.GetProperty("createdBy"); Assert.Equal(3, creator.EnumerateObject().Count());
-        Assert.Equal(subject, creator.GetProperty("subject").GetString()); Assert.Equal(email, creator.GetProperty("email").GetString()); Assert.Equal(name, creator.GetProperty("name").GetString());
+        var creatorName = result.GetProperty("createdByName"); Assert.True(result.GetProperty("isCreatedByMe").GetBoolean());
+
         var stored = Assert.Single(fixture.Projects.Items, project => project.Id == id);
         Assert.Equal(subject, stored.CreatedByGoogleSubject); Assert.Equal(email, stored.CreatedByEmail); Assert.Equal(name, stored.CreatedByName);
         fixture.Http.DefaultRequestHeaders.Remove("X-SnG-Active-Role");
@@ -113,8 +113,8 @@ public class CommercialIdentityHttpTests(ApiFixture fixture) : IClassFixture<Api
         fixture.Tasks.Items.Add(new ProjectTask(id, OperationalArea.Commercial, ProjectTaskType.ReviewQuotation, "google-test-subject"));
         var fetched = await fixture.Http.GetFromJsonAsync<JsonElement>($"/api/projects/{id}");
         var listed = await fixture.Http.GetFromJsonAsync<JsonElement>("/api/projects");
-        Assert.Equal(creator.GetRawText(), fetched.GetProperty("createdBy").GetRawText());
-        Assert.Equal(creator.GetRawText(), Assert.Single(listed.EnumerateArray(), item => item.GetProperty("id").GetGuid() == id).GetProperty("createdBy").GetRawText());
+        Assert.Equal(creatorName.GetRawText(), fetched.GetProperty("createdByName").GetRawText());
+        Assert.Equal(creatorName.GetRawText(), Assert.Single(listed.EnumerateArray(), item => item.GetProperty("id").GetGuid() == id).GetProperty("createdByName").GetRawText());
     }
 
     [Fact]
@@ -134,9 +134,9 @@ public class CommercialIdentityHttpTests(ApiFixture fixture) : IClassFixture<Api
         var legacyTasks = await fixture.Http.GetFromJsonAsync<JsonElement>($"/api/projects/{legacyProject.Id}/tasks");
         Assert.Equal(JsonValueKind.Null, Assert.Single(legacyTasks.EnumerateArray()).GetProperty("assignedToGoogleSubject").ValueKind);
         var fetched = await fixture.Http.GetFromJsonAsync<JsonElement>($"/api/projects/{project.Id}");
-        Assert.Equal(JsonValueKind.Null, fetched.GetProperty("createdBy").ValueKind);
+        Assert.Equal(JsonValueKind.Null, fetched.GetProperty("createdByName").ValueKind);
         var projects = await fixture.Http.GetFromJsonAsync<JsonElement>("/api/projects");
-        Assert.Equal(JsonValueKind.Null, Assert.Single(projects.EnumerateArray(), p => p.GetProperty("id").GetGuid() == project.Id).GetProperty("createdBy").ValueKind);
+        Assert.Equal(JsonValueKind.Null, Assert.Single(projects.EnumerateArray(), p => p.GetProperty("id").GetGuid() == project.Id).GetProperty("createdByName").ValueKind);
         Assert.Equal(HttpStatusCode.Forbidden, (await fixture.Http.GetAsync("/api/project-tasks?area=Commercial&status=InProgress")).StatusCode);
         foreach (var route in new[] { $"/api/projects/{project.Id}/tasks" })
         {

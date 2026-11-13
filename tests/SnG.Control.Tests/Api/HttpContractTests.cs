@@ -38,8 +38,8 @@ public class HttpContractTests(ApiFixture fixture) : IClassFixture<ApiFixture>
         using var created = await fixture.Http.PostAsJsonAsync("/api/projects", request);
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var project = await created.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal(9, project.EnumerateObject().Count());
-        Assert.Equal("google-test-subject", project.GetProperty("createdBy").GetProperty("subject").GetString());
+        Assert.Equal(10, project.EnumerateObject().Count());
+        Assert.True(project.GetProperty("isCreatedByMe").GetBoolean());
         Assert.Equal(request.clientId, project.GetProperty("clientId").GetGuid());
         Assert.Equal("Casa", project.GetProperty("name").GetString());
         Assert.Equal("Ciudad", project.GetProperty("city").GetString());

@@ -193,6 +193,10 @@ public class ManagementHttpTests(ApiFixture fixture) : IClassFixture<ApiFixture>
         Assert.True(document.GetProperty("paths").GetProperty("/api/projects/{id}/measurements/submissions").TryGetProperty("post", out _));
         foreach (var operation in new[] { ("/api/projects/{id}/opening-filings", "get"), ("/api/projects/{id}/opening-filings/{filingId}/commands", "post"), ("/api/projects/{id}/opening-filings/{filingId}/documents", "post"), ("/api/projects/{id}/opening-filings/{filingId}/versions/{versionId}/documents/{documentId}/download", "get") })
             Assert.True(document.GetProperty("paths").GetProperty(operation.Item1).TryGetProperty(operation.Item2, out _));
-        Assert.Equal(75, document.GetProperty("paths").EnumerateObject().Sum(p => p.Value.EnumerateObject().Count(o => o.Name is "get" or "post" or "put" or "delete")));
+        Assert.True(document.GetProperty("paths").GetProperty("/api/management/analytics/surfaces").TryGetProperty("get", out _));
+        var dashboard = document.GetProperty("paths").GetProperty("/api/management/dashboard-dataset").GetProperty("get");
+        foreach (var status in new[] { "200", "401", "403" }) Assert.True(dashboard.GetProperty("responses").TryGetProperty(status, out _));
+        Assert.False(dashboard.TryGetProperty("requestBody", out _));
+        Assert.Equal(91, document.GetProperty("paths").EnumerateObject().Sum(p => p.Value.EnumerateObject().Count(o => o.Name is "get" or "post" or "put" or "delete")));
     }
 }

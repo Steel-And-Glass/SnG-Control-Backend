@@ -27,6 +27,7 @@ public class NotificationWorkerAndConfigTests
         using var storage = new TemporaryStorage();
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Testing" });
         builder.Logging.ClearProviders(); builder.Services.AddApiServices();
+        builder.Services.Configure<OperationsHeadOptions>(o => o.OperationsHeadSubject = "synthetic-operations");
         builder.Services.Configure<ManagementOptions>(options => options.ManagementSubject = "management-test-subject"); builder.Services.RemoveAll<IHostedService>();
         builder.Services.Configure<GoogleAuthenticationOptions>(o => o.ClientId = "synthetic-client");
         builder.Services.Configure<AccountingAssigneeOptions>(o => o.AccountingAssigneeSubject = "synthetic-accountant");

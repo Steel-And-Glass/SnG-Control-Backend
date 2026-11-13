@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
@@ -37,6 +37,7 @@ internal sealed class IncrementalHttpHarness : IAsyncDisposable
     public Guid ProjectId { get; private set; }
     public HttpClient Http { get; private set; } = null!;
     public SnGControlDbContext Db() => new(new DbContextOptionsBuilder<SnGControlDbContext>().UseNpgsql(connection).Options);
+    public void EnableExtraction()=>app.Services.GetRequiredService<IOptions<SnG.Control.Application.Features.Operations.DocumentExtractionOptions>>().Value.Enabled=true;
     public IStreamingFileStorage Files => app.Services.GetRequiredService<IStreamingFileStorage>();
     // Test-only replacement of the effective startup membership. Production IOptions is not hot-reloaded.
     public void SetAdvisorMembership(params string[] subjects) => app.Services.GetRequiredService<IOptions<SnG.Control.Api.Authorization.CommercialAdvisorOptions>>().Value.CommercialAdvisorSubjects = subjects;
@@ -59,6 +60,7 @@ internal sealed class IncrementalHttpHarness : IAsyncDisposable
             ["Authentication:EngineeringAssigneeSubject"] = "engineer",
             ["Authentication:EngineeringWorkerSubjects:0"] = "worker",
             ["Authentication:ManagementSubject"] = "management",
+            ["Authentication:OperationsHeadSubject"] = "operations",
             ["Authentication:CommercialHeadSubject"] = "head",
             ["Authentication:BudgetsAssigneeSubject"] = "budgets",
             ["Authentication:AccountingAssigneeSubject"] = "accountant",
@@ -92,5 +94,5 @@ internal sealed class IncrementalHttpHarness : IAsyncDisposable
 // Compiled exclusively into the test assembly. No Google calls or production authentication bypass.
 public sealed class IncrementalSyntheticAuthentication(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder) : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
-    protected override Task<AuthenticateResult> HandleAuthenticateAsync() { var value = Request.Headers.Authorization.ToString(); if (value.Length == 0) return Task.FromResult(AuthenticateResult.NoResult()); var actor = value.StartsWith("Bearer synthetic-", StringComparison.Ordinal) ? value[17..] : ""; if (!new[] { "advisor", "other-advisor", "installer", "engineer", "worker", "management", "head", "outsider" }.Contains(actor)) return Task.FromResult(AuthenticateResult.Fail("Unknown synthetic identity")); var p = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim("sub", actor), new Claim("email", actor + "@example.test"), new Claim("name", actor), new Claim("email_verified", "true") }, Scheme.Name)); return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(p, Scheme.Name))); }
+    protected override Task<AuthenticateResult> HandleAuthenticateAsync() { var value = Request.Headers.Authorization.ToString(); if (value.Length == 0) return Task.FromResult(AuthenticateResult.NoResult()); var actor = value.StartsWith("Bearer synthetic-", StringComparison.Ordinal) ? value[17..] : ""; if (!new[] { "advisor", "other-advisor", "installer", "engineer", "worker", "management", "head", "outsider", "operations" }.Contains(actor)) return Task.FromResult(AuthenticateResult.Fail("Unknown synthetic identity")); var p = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim("sub", actor), new Claim("email", actor + "@example.test"), new Claim("name", actor), new Claim("email_verified", "true") }, Scheme.Name)); return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(p, Scheme.Name))); }
 }

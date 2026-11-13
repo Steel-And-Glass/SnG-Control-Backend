@@ -4,12 +4,11 @@ using SnG.Control.Domain.Enums;
 namespace SnG.Control.Application.Features.Projects;
 
 public sealed record ProjectResponse(Guid Id, Guid ClientId, string Name, string City,
-    ProductLine ProductLine, string? SgCode, DateTime CreatedAt, DateTime UpdatedAt, ProjectCreatorResponse? CreatedBy)
+    ProductLine ProductLine, string? SgCode, DateTime CreatedAt, DateTime UpdatedAt, string? CreatedByName, bool IsCreatedByMe)
 {
-    internal static ProjectResponse FromEntity(Project entity) => new(
+    internal static ProjectResponse FromEntity(Project entity, string? currentSubject) => new(
         entity.Id, entity.ClientId, entity.Name, entity.City,
         entity.ProductLine, entity.SgCode, entity.CreatedAt, entity.UpdatedAt,
-        entity.CreatedByGoogleSubject is null ? null : new(entity.CreatedByGoogleSubject, entity.CreatedByEmail, entity.CreatedByName));
+        entity.CreatedByName, entity.CreatedByGoogleSubject is not null && entity.CreatedByGoogleSubject == currentSubject);
 }
 
-public sealed record ProjectCreatorResponse(string Subject, string? Email, string? Name);

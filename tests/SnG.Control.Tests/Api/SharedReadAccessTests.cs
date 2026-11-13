@@ -50,14 +50,15 @@ public class SharedReadAccessTests(MultiRoleFixture fixture) : IClassFixture<Mul
         var areaTasks = role == "Budgets" ? await inbox.Content.ReadFromJsonAsync<JsonElement[]>() : [];
         foreach (var project in projects)
         {
-            var allowed = role == "Management" || (role, project.Name) is ("CommercialAdvisor", "owner") or ("Budgets", "budget") or ("CommercialHead", "review");
-            Assert.Equal(allowed, listed!.Any(p => p.GetProperty("id").GetGuid() == project.Id));
-            var clientAllowed = allowed || role == "CommercialAdvisor";
+            var visible = role switch { "Management" or "CommercialHead" => true, "CommercialAdvisor" => project.Name == "owner", "Budgets" => project.Name is "budget" or "foreign", _ => false };
+            var resourceAllowed = role == "Management" || (role, project.Name) is ("CommercialAdvisor", "owner") or ("Budgets", "budget") or ("CommercialHead", "review");
+            Assert.Equal(visible, listed!.Any(p => p.GetProperty("id").GetGuid() == project.Id));
+            var clientAllowed = visible || role == "CommercialAdvisor";
             Assert.Equal(clientAllowed, clients!.Any(c => c.GetProperty("id").GetGuid() == project.ClientId));
             Assert.Equal(clientAllowed ? HttpStatusCode.OK : HttpStatusCode.NotFound, (await http.GetAsync($"/api/clients/{project.ClientId}")).StatusCode);
             foreach (var suffix in new[] { "", "/tasks", "/notifications" })
-                Assert.Equal(allowed ? HttpStatusCode.OK : HttpStatusCode.NotFound, (await http.GetAsync($"/api/projects/{project.Id}{suffix}")).StatusCode);
-            Assert.Equal(allowed ? HttpStatusCode.OK : HttpStatusCode.Forbidden, (await http.GetAsync($"/api/projects/{project.Id}/documents")).StatusCode);
+                Assert.Equal(visible ? HttpStatusCode.OK : HttpStatusCode.NotFound, (await http.GetAsync($"/api/projects/{project.Id}{suffix}")).StatusCode);
+            Assert.Equal(resourceAllowed ? HttpStatusCode.OK : HttpStatusCode.Forbidden, (await http.GetAsync($"/api/projects/{project.Id}/documents")).StatusCode);
             Assert.Equal(role == "Budgets" && project.Name == "budget", areaTasks!.Any(t => t.GetProperty("projectId").GetGuid() == project.Id));
         }
         Assert.Equal(before, JsonSerializer.Serialize(new { projects, tasks = fixture.Tasks.Items }));

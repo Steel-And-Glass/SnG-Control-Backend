@@ -17,6 +17,6 @@ public class CreateProjectUseCase(IProjectStore projects, IClientStore clients, 
         }
 
         await projects.AddAsync(project, cancellationToken);
-        return ProjectResponse.FromEntity(project);
+        return ProjectResponse.FromEntity(project, currentUser.Subject);
     }
 }

@@ -6,7 +6,7 @@ namespace SnG.Control.Tests.TestDoubles;
 public class ClientStoreDouble : IClientStore
 {
     public ProjectStoreDouble Projects { get; set; } = new();
-    private bool CanRead(Guid id, SnG.Control.Application.Access.ProjectReadScope scope) => scope.AllClients || Projects.Items.Any(p => p.ClientId == id && scope.CanRead(p, Projects.Tasks));
+    private bool CanRead(Guid id, SnG.Control.Application.Access.ProjectReadScope scope) => scope.AllClients || Projects.Items.Any(p => p.ClientId == id && scope.Visibility(Projects.Tasks.AsQueryable()).Compile()(p));
     public async Task<Client?> GetReadableByIdAsync(Guid id, SnG.Control.Application.Access.ProjectReadScope scope, CancellationToken token)
     { var c = await GetByIdAsync(id, token); return c is not null && CanRead(id, scope) ? c : null; }
     public async Task<IReadOnlyList<Client>> ListReadableAsync(SnG.Control.Application.Access.ProjectReadScope scope, CancellationToken token) =>

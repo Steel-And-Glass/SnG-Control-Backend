@@ -48,9 +48,13 @@ public static class DependencyInjection
         services.AddScoped<IRequotationStore, EfRequotationStore>();
         services.AddScoped<RequotationService>();
         services.AddActiveRoles();
+        services.AddOperationsHead();
         services.AddScoped<SnG.Control.Application.Access.ProjectReadAccess>();
         services.AddManagementAuthorization();
         services.AddScoped<IManagementReadStore, EfManagementReadStore>();
+        services.AddScoped<IManagementSurfaceStore, EfManagementSurfaceStore>();
+        services.AddScoped<IManagementDashboardStore, EfManagementDashboardStore>();
+        services.AddScoped<GetManagementDashboardDatasetUseCase>();
         services.AddScoped<ListManagementTasksUseCase>();
         services.AddScoped<GetManagementOverviewUseCase>();
         services.AddScoped<GetManagementQuotationPortfolioUseCase>();

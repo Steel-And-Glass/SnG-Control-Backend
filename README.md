@@ -14,13 +14,15 @@ Google identifica al usuario mediante el **Subject (`sub`)**, nunca por email o 
 
 Las membresías V1 provienen de configuración: `Authentication:CommercialAdvisorSubjects` es una lista explícita de asesores; `BudgetsAssigneeSubject`, `CommercialHeadSubject`, `AccountingAssigneeSubject` y `ManagementSubject` asignan sus respectivos roles. Una cuenta puede poseer varios, pero cada request operacional debe enviar **`X-SnG-Active-Role`** con uno que realmente posea. Sin autenticación válida se responde 401; sin área, con un valor inválido o con un rol ajeno, 403. No hay tabla Users/UserRoles, passwords ni tokens propios.
 
-Los roles activos implementados son `CommercialAdvisor`, `Budgets`, `CommercialHead`, `Accounting`, `Installation`, `Engineering` y `Management`. Production y Logistics están reservados en el contrato, sin experiencia operativa. Solo el Asesor activo crea clientes/proyectos y envía a Presupuestos un proyecto propio. Puede modificar documentos propios; el Jefe Comercial escribe únicamente en su revisión comercial. Presupuestos y Jefe consultan documentos de proyectos con su tarea asignada, incluso completada. Gerencia tiene lectura transversal, sin adquirir escritura por compartir Subject con el creador o el Jefe.
+Los roles activos implementados son `CommercialAdvisor`, `Budgets`, `CommercialHead`, `Accounting`, `Installation`, `Engineering`, `Management` y `OperationsHead` (fundamentos Backend P2.1). Production y Logistics están reservados en el contrato, sin experiencia operativa. Solo el Asesor activo crea clientes/proyectos y envía a Presupuestos un proyecto propio. Puede modificar documentos propios; el Jefe Comercial escribe únicamente en su revisión comercial. Presupuestos y Jefe consultan documentos de proyectos con su tarea asignada, incluso completada. Gerencia tiene lectura transversal, sin adquirir escritura por compartir Subject con el creador o el Jefe.
 
 La política BudgetsAssignee exige membresía y área activa Budgets. SG, preview, confirmación y envío a Comercial requieren también PrepareQuotation asignada al Subject actual; una tarea sin asignación o asignada a otro usuario no permite esas acciones. CommercialHead activo puede descargar el Excel operativo de proyectos con ReviewQuotation asignada y revisar/confirmar según workflow. El archivo final permite acceso al Jefe activo asignado o al Asesor activo propietario.
 
 Cambiar de área no cambia `Project.CreatedByGoogleSubject`, el responsable comercial original, las asignaciones de tareas ni sus plazos. Los handoffs siguen asignando PrepareQuotation a Presupuestos, ReviewQuotation al Jefe y PresentQuotationToClient al creador original.
 
 ## Gerencia V1
+
+G2.1 añade `GET /api/management/analytics/surfaces`, de solo lectura para Management activo. Agrega m² documentales de la cotización comercial vigente (SquareMeters ya incluye cantidad) y superficie rectangular de referencia de medidas actuales (ancho real × alto real en metros, una vez por estructura física activa). Devuelve cobertura, exclusiones, filtros y páginas de proyectos. Esta referencia no es vidrio neto ni fabricación. La superficie radicada congelada queda no disponible hasta definir selección de versiones; no se reconstruye con datos actuales. No cambia workflows ni requiere migraciones.
 
 La cuenta configurada mediante `Authentication:ManagementSubject` tiene visibilidad transversal de solo lectura. Su resumen muestra el total real de proyectos, los conteos de tareas y Lead Times por estado y área, y hasta diez tareas que requieren atención: primero atrasadas, luego las que vencen hoy y después las próximas a vencer. No se inventa un estado global de proyecto.
 
@@ -689,3 +691,64 @@ crea otra version. La entrega original permanece inmutable y descargable.
 
 Los expedientes historicos sin evidencia completa conservan su consulta y bloqueo
 `LEGACY_INCOMPLETE_EVIDENCE`; no hay backfill, PDFs regenerados ni radicaciones ficticias.
+
+
+## Jefe de Operaciones — fundamentos P2.1
+
+`OperationsHead` se asigna por `Authentication:OperationsHeadSubject`, obligatorio y validado
+al iniciar. Google Subject y rol activo deben coincidir; Production no hereda este permiso.
+El Backend permite consultar liberaciones confirmadas y crear explícitamente, mediante POST
+idempotente, una preparación documental por liberación. Los GET no crean registros.
+La preparación conserva proyecto, expediente, versión, hash, actor/fecha UTC y el alcance
+exacto de OP/estructuras/documentos del manifiesto. Los expedientes sin evidencia válida
+no pueden originarla. La creación no cambia tareas, documentos ni estados de Ingeniería.
+
+P2.2 habilita extracción determinista controlada desde estos documentos confirmados.
+La aprobación humana se gestiona en P2.3, sobre una revisión separada. No se ejecutan
+checklists ni tareas de fabricación; las filas originales no se editan ni publican unidades físicas.
+No hay pantalla nueva en esta fase. La migración requiere aplicación explícita posterior;
+no se aplica automáticamente al iniciar ni se ha aplicado al entorno de desarrollo.
+
+
+## Extracción documental de Operaciones — P2.2
+
+OperationsHead puede solicitar la extracción mediante POST sin componentes enviados por el
+cliente. La API encola un trabajo persistente y devuelve 202. Un worker procesa la lista de
+corte no optimizada y el PDF de Vidrios de la versión liberada, verificando tamaños y SHA-256.
+Conserva cantidades agrupadas, Medida/CT separadas, referencia/serie, OP/StructureId y evidencia
+por documento/página/región. Las anotaciones de material no equivalen a material verificado.
+
+La preparación termina `Blocked` ante errores críticos, `Extracted` si conserva advertencias
+revisables, o `ReadyForReview` si no hay incidencias. Ningún estado significa aprobación.
+Las OP extrañas, pérdida de alcance, discrepancias de totales, filas no clasificadas e ilegibilidad
+no se ocultan ni corrigen. El material de los candidatos de Vidrios queda sin verificar.
+No se importan tickets XLS/XLSX/CSV ni se aplican ajustes dimensionales en esta fase.
+
+La función permanece deshabilitada hasta configurar explícitamente el procesador externo y
+aplicar las migraciones autorizadas. P2.2 no modifica Radicación de Vanos, sus confirmaciones,
+los releases existentes ni el Frontend. La aprobación P2.3 no crea autorización ejecutable para fabricar ni tareas operativas.
+
+
+## Revisión y aprobación de Operaciones — P2.3
+
+OperationsHead revisa cada componente en una revisión independiente de la extracción original.
+Puede registrar correcciones justificadas, clasificar material/ruta, añadir componentes con
+respaldo dentro de las OP del release, excluir candidatos y documentar incidencias. Originales,
+valores corregidos, evidencias y cambios conservan identidad, actor y fecha. Los adjuntos de
+revisión son privados e independientes de Ingeniería; no se interpretan ni modifican.
+
+Los conflictos de cantidades (28/35) y dimensiones entre fuentes (incluido 0,1) permanecen
+abiertos: no hay prioridad autorizada entre PDF, XLS, XLSX o CSV, tolerancias ni ajustes automáticos.
+Se permiten observaciones/evidencias, pero no resolver esos conflictos ni aprobar ignorándolos.
+Las OP ajenas, hashes inválidos e integridad insuficiente también bloquean. La reextracción
+explícita conserva revisiones anteriores y traslada conflictos formales/de integridad pendientes.
+
+Una revisión consistente puede aprobarse expresamente: el servidor comprueba release, hashes de
+archivos, correspondencia OP/StructureId, clasificación, cantidades, dimensiones, cobertura y
+resoluciones. Guarda un snapshot canónico con hash, actor, fecha y revisión exacta. La revisión
+queda congelada y una preparación solo puede tener una aprobación en esta fase. No se generan
+unidades, tareas ni checklists. Gerencia tiene lectura; Production no hereda escritura.
+
+El Backend está implementado sin pantallas nuevas. La migración solo se probó en PostgreSQL
+ temporal; no se aplicó a sng_control. P2.4 deberá construir la experiencia de revisión sobre estos
+contratos, sin inventar políticas para resolver discrepancias documentales.

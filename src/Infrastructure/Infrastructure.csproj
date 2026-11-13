@@ -24,4 +24,5 @@
   </PropertyGroup>
 
   <ItemGroup><EmbeddedResource Include="Persistence/Migrations/20261110152041_IncrementalFoundation.sql" /></ItemGroup>
+  <ItemGroup><Content Include="Extraction/Python/*.py" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
 </Project>

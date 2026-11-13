@@ -61,6 +61,7 @@ public class ApiFixture : IAsyncLifetime
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Logging.ClearProviders();
         builder.Services.AddApiServices();
+        builder.Services.Configure<OperationsHeadOptions>(o => o.OperationsHeadSubject = "operations-test-subject");
         builder.Services.Configure<CommercialAdvisorOptions>(options => options.CommercialAdvisorSubjects = ["google-test-subject", "other-google-subject"]);
         builder.Services.Configure<ManagementOptions>(options => options.ManagementSubject = "management-test-subject");
         builder.Services.RemoveAll<Microsoft.Extensions.Hosting.IHostedService>();

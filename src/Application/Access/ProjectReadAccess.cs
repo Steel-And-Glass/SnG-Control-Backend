@@ -31,5 +31,18 @@ public sealed record ProjectReadScope(string Subject, SystemRole? Role)
             && task.Type == ProjectTaskType.TakeMeasurements && task.Area == OperationalArea.Installation && task.AssignedToGoogleSubject == Subject),
         _ => project => false
     };
+    // Project-level visibility (lists, detail, client context, project tasks). Resource-level access (documents, quotations,
+    // accounting, engineering, measurements) keeps using Filter, which remains assignment-based.
+    public Expression<Func<Project, bool>> Visibility(IQueryable<ProjectTask> tasks) => Role switch
+    {
+        SystemRole.Management => project => true,
+        SystemRole.CommercialHead when !string.IsNullOrEmpty(Subject) => project => true,
+        SystemRole.CommercialAdvisor when !string.IsNullOrEmpty(Subject) => project => project.CreatedByGoogleSubject == Subject,
+        SystemRole.Budgets when !string.IsNullOrEmpty(Subject) => project => tasks.Any(task => task.ProjectId == project.Id && task.Area == OperationalArea.Budgets),
+        SystemRole.Accounting when !string.IsNullOrEmpty(Subject) => project => tasks.Any(task => task.ProjectId == project.Id && task.Area == OperationalArea.Accounting),
+        SystemRole.Installation when !string.IsNullOrEmpty(Subject) => project => tasks.Any(task => task.ProjectId == project.Id && task.Area == OperationalArea.Installation),
+        SystemRole.Engineering when !string.IsNullOrEmpty(Subject) => project => tasks.Any(task => task.ProjectId == project.Id && task.Area == OperationalArea.Engineering),
+        _ => project => false
+    };
     public bool CanRead(Project project, IEnumerable<ProjectTask> tasks) => Filter(tasks.AsQueryable()).Compile()(project);
 }

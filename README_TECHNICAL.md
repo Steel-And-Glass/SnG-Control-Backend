@@ -737,6 +737,16 @@ Los tests sintéticos cubren autorización antes de consumir body, límites exac
 
 ## Consultas gerenciales
 
+### Superficies G2.1
+
+`ManagementSurfacesController` expone GET `/api/management/analytics/surfaces` con la policy Management existente y no-store. Rechaza claves desconocidas/repetidas, enums numéricos, GUID vacíos y filtros inválidos. Acepta projectId, clientId, city exacta (máximo 200), productLine, area, status, skip (0..1000000) y ascending. Área y estado deben coincidir en la misma tarea; seleccionan proyectos completos, no una proporción de su superficie.
+
+`EfManagementSurfaceStore` usa lecturas sin tracking en transacción RepeatableRead. Reutiliza CurrentCommercial/CurrentCommercialItems para no sumar versiones anteriores. SquareMeters es la superficie total documental del ítem, ya incluye cantidad: se suman valores positivos sin multiplicar Quantity. La referencia actual suma ActualWidth × ActualHeight (metros persistidos) de cada MeasurementStructure activa con dimensiones positivas; no multiplica UnitCount ni une documentos/tareas para sumar. Excluye estructuras retiradas y dimensiones ausentes/no positivas, con motivos separados. No representa geometría real, vidrio neto, consumo ni fabricación, y no se resta de cotizado para inferir pendiente.
+
+Agregados de toda la selección y detalle de 50 proyectos, orden por superficie cotizada ascendente/descendente, ausentes al final y desempate por ID. Valores m² como cadenas decimales invariantes; null cuando no hay elegibles. Cada agregado incluye unidad, elegibles, excluidas, motivos, fuente y definición. Filed devuelve null con FrozenVersionSelectionNotDefined y cuenta membresías por ProjectId/StructureId distintos; no interpreta snapshots ni selecciona silenciosamente enmiendas. Hace falta una regla explícita para representar superficie congelada. No hay agregados de fabricación.
+
+`ManagementSurfaceTests` cubre autorización, filtros, semántica y precisión. `ManagementSurfacePostgresTests` es opt-in mediante SNG_G21_ADMIN: exige localhost/127.0.0.1:5432 y base administrativa postgres, crea un nombre sng_g21_temp_GUID, verifica identidad antes de escribir y elimina únicamente esa base en finally, comprobando su ausencia. Usa esquema mínimo y datos sintéticos para ejecutar las consultas EF reales; no valida migraciones ni conecta a sng_control. Verifica versión vigente, cantidades, exclusiones, deduplicación, filtros, detalle/totales y ausencia de tracking. Sin variable, la prueba retorna sin ejecutar PostgreSQL; no interpretar ese resultado como validación real. Si API local bloquea bin/Debug, compilar/probar con `-p:UseAppHost=false -p:OutputPath=bin/G21/` sin detener el servicio operativo.
+
 `Authentication:ManagementSubject` es obligatoria al startup mediante ManagementOptions, BindConfiguration("Authentication") y ValidateOnStart. Null, vacío o whitespace producen únicamente `Configure Authentication:ManagementSubject.`. ConfiguredManagementIdentity implementa IManagementIdentity en Api; Application solo conoce Subject. La policy `Management` exige autenticación y Management disponible y activo. El resolver compara el claim `sub` exactamente con StringComparison.Ordinal; no recorta, normaliza ni usa email/nombre como fallback.
 
 ```powershell
@@ -2211,3 +2221,327 @@ Limites tecnicos configurables: `OpeningFiling:MaxFileBytes` (default 26214400, 
 existente) y `OpeningFiling:MaxProjectStorageBytes` (default 2147483648). La cuota cuenta bytes
 fisicos historicos una sola vez; no hay un numero maximo de archivos por categoria o radicaciones.
 El servidor sigue siendo autoridad; un 409 exige recargar sin reintentar writes automaticamente.
+
+
+## OperationsHead / preparación documental P2.1
+
+Configuración obligatoria (ejemplo sin identidad real):
+`Authentication:OperationsHeadSubject=<GOOGLE_SUBJECT_JEFE_OPERACIONES>` en User Secrets,
+o `Authentication__OperationsHeadSubject` mediante entorno. Validación al iniciar: no vacío,
+sin espacios exteriores/control y máximo 200 caracteres; nunca se imprime su valor.
+`SystemRole.OperationsHead=10` se incorpora al resolver y al mecanismo de rol activo existente.
+No se deriva de Production, email, asignaciones de Ingeniería o membresía de Gerencia.
+El Frontend y sus contratos se dejan intactos en P2.1; su adopción del nuevo rol es posterior.
+
+Endpoints autenticados con `X-SnG-Active-Role: OperationsHead` y Subject configurado:
+
+| Método y ruta bajo `/api/operations` | Contrato |
+| --- | --- |
+| GET `releases?skip=0` | Liberaciones, IDs proyecto/expediente/versión, fecha/hash y preparación asociada nullable. |
+| GET `preparations?skip=0` | Preparaciones, origen, estado, revisión y metadatos del extractor/revisor nullable. |
+| GET `preparations/{id}` | Resumen y alcance congelado de estructuras/OP y documentos/hash/categoría; 404 si ausente. |
+| POST `releases/{versionId}/preparation` | Sin body; 200 con preparación creada o existente. Sin transición implícita en GET. |
+
+Listas ordenadas establemente, máximo 50 por página, `skip` no negativo y cache no-store.
+Lectura y escritura tienen guardas explícitas separadas; en P2.1 ambas requieren OperationsHead.
+No se extienden permisos de Gerencia ni otras áreas. 401 sigue la autenticación Google;
+403 `OperationsAccessDenied`, 404 `OperationsReleaseNotFound`, 409
+`OperationsReleaseEvidenceInvalid`; no se acepta estado/alcance arbitrario del cliente.
+El detalle expone IDs y hashes, no rutas físicas, URLs de storage ni contenido de archivos.
+No hay endpoint nuevo de descarga ni permiso implícito para descargar fuentes.
+
+Entidades/tablas nuevas:
+
+- `ProductionPreparations`: FK a `OpeningFilingRelease.VersionId`, proyecto/expediente,
+  hash, actor/UTC, estado, Revision de concurrencia, extractor/revisor nullable.
+- `PreparationSourceMembers`: alcance exacto de StructureId/OP de esa versión.
+- `PreparationSourceDocuments`: documento, hash y categoría de esa versión, no documentos actuales del proyecto.
+- `ProductionComponentRevisions`: revisión numerada, actor/UTC y concurrencia; sin aprobación.
+- `ProductionCandidateRows`: FK compuesta a revisión/preparación, miembro/OP y documento/hash;
+  campos técnicos nullable, cantidad nullable positiva, PieceId original, página/fila/hoja,
+  plantilla/extractor, especificaciones/diagnósticos/coordenadas JSONB. Medida y CT separados,
+  decimales PostgreSQL numeric sin redondeo forzado. No deduplicación por aspecto o dimensiones.
+
+Material y ruta son distintos: Glass -> Glass, AluminumProfile -> Aluminum,
+MicroperforatedSheet -> Aluminum. Material desconocido se conserva como texto declarado y
+clasificación/ruta null; no se infiere por nombre del PDF. No se inventan valores ausentes.
+Los IDs de filas son propios; PieceId documental no identifica una unidad física publicada.
+La revisión candidata no equivale a aprobación. Una futura unidad deberá referenciar revisión
+aprobada + fila + ordinal, con unicidad e inmutabilidad; no existe tabla ni publicación de
+unidades en P2.1 para no habilitar producción antes de la aprobación autorizada.
+
+La creación usa transacción y bloqueo de proyecto; índice único por release asegura un solo
+registro y reintentos concurrentes idempotentes. P2.1 no permite archivar/reemplazar preparaciones.
+Las FK restringen borrados. Triggers nuevos, exclusivamente sobre las tablas nuevas, verifican
+release confirmado, hash/manifiesto, evidencia atestada, OP y documentos; un constraint trigger
+diferido exige alcance completo al commit. El alcance es inmutable; P2.2 permite únicamente cambios controlados de estado/revisión/extractor de la preparación.
+Los triggers históricos no se modifican ni desactivan. `Revision` está preparada como token EF;
+no existe actualización pública cuya concurrencia optimista pueda ejercerse todavía.
+
+P2.1 creaba únicamente `PendingExtraction`; P2.2 habilita `Extracted`, `Blocked` y
+`ReadyForReview` como resultados de extracción. No existe `Approved` ni publicación.
+La migración `20261113060747_AddProductionPreparationFoundation` solo añade tablas,
+restricciones y funciones/triggers nuevos; no hace backfill ni reescribe evidencia histórica.
+
+Validación: `OperationsPreparationTests`, `ProductionPreparationTests` y
+`ProductionPreparationHttpChecks` (integrado en `IncrementalEndToEndTests`) cubren autorización,
+configuración, ausencia de GET writes, release confirmado, idempotencia concurrente, FK de
+OP/estructura/hash, rutas de material, filas idénticas legítimas e inmutabilidad. La prueba E2E
+revierte/reaplica solo la nueva migración con un flujo histórico sintético ya guardado y compara
+los registros de todas las tablas históricas y definiciones de sus triggers. Las pruebas
+`IncrementalFoundationTests` comprueban legado completo/incompleto al migrar. PostgreSQL real
+se usa exclusivamente con `SNG_VERIFICATION_TEST_DATABASE` en una instancia temporal verificada;
+no se ejecuta contra `sng_control` ni datos operativos.
+
+P2.2 se implementa a continuación. Las etapas futuras obligatorias siguen siendo corte+pulido
+para vidrio y corte+mecanizado para aluminio/microperforada; ensamble por OP exigirá completar
+todos sus componentes. Ninguna operación de fabricación se implementa en estas fases.
+
+
+## Extracción determinista P2.2 — arquitectura y despliegue
+
+Arquitectura: `OperationsPreparationsController` solo valida rol/Subject y solicita trabajo.
+`EfDocumentExtractionStore` resuelve la versión exacta, lee almacenamiento privado y verifica
+cada PDF fuente contra `SizeBytes` y SHA-256 del manifiesto confirmado. Nunca consulta el último
+archivo del proyecto. `DocumentExtractionBackgroundService` ejecuta una iteración scoped con
+cola PostgreSQL durable. `PythonDocumentComponentProcessor` lanza un proceso separado, sin shell,
+con entorno vaciado y protocolo stdin/stdout acotado; no recibe credenciales, rutas de storage ni
+conexión a PostgreSQL. Los archivos originales no se modifican y no se crean temporales PDF.
+
+El módulo desplegado `Infrastructure/Extraction/Python/parser.py` porta las reglas de P1.1;
+no importa ni ejecuta el experimento desde HTTP. `runner.py` implementa el protocolo versionado
+`p2.2.1`, sin ZIP, IA, OCR, acciones JavaScript/PDF, macros ni intérprete de dibujos. La extracción
+usa texto y posiciones de PDFium; conserva contexto de perfiles entre páginas. No se reconstruyó
+el parser en C# para evitar divergencias en las reglas ya contrastadas; C# conserva autoridad
+sobre autorización, hashes, alcance relacional, estados y transacciones. P1 queda independiente.
+
+| Ruta bajo `/api/operations` | Comportamiento |
+| --- | --- |
+| POST `preparations/{id}/extraction` | Bodyless, 202 con job; solo OperationsHead activo/configurado. 503 si deshabilitado. |
+| GET `preparations/{id}/extraction` | Estado, intentos, revisión, fechas, código seguro, informe y eventos; 404 sin job. |
+| GET `preparations/{id}/candidates?skip=0` | Filas persistidas, orden estable y máximo 100; sin edición. |
+
+Los GET usan la misma autorización de lectura de P2.1 y no crean trabajos. El POST no permite
+inyectar filas, estado o aprobación. Los reportes contienen evidencia privada: acceso autenticado,
+no-store y nunca logs. No hay nuevo endpoint de archivos ni cambios a permisos históricos.
+
+### Persistencia y recuperación
+
+`DocumentExtractionJobs` tiene FK a preparación y unicidad `(PreparationId, ExtractorVersion)`:
+actor/UTC de solicitud, estado de trabajo, Attempts, Revision de concurrencia, lease aleatorio con
+vencimiento, fecha final, ErrorCode y ReportJson/EventsJson JSONB. El informe conserva diagnósticos,
+filas rechazadas, totales declarados/calculados y auditoría de líneas, incluso con bloqueo.
+Los candidatos válidos mantienen las FK de P2.1; nunca se inventa StructureId para OP desconocidas.
+Serie, estructura indicada en PDF, composición/contexto y texto original están en SpecificationsJson;
+las columnas conservan OP/StructureId, referencia, dimensiones originales, Medida y CT, cantidad,
+ángulos, material/ruta nullable, IDs/hash, página/fila, CoordinatesJson y versiones. Los diagnósticos
+documentales se guardan una vez en ReportJson; no se duplican masivamente por cada fila.
+
+Cada resultado documental final crea una revisión de componentes y sus filas en la misma
+transacción que el estado de preparación/job. No expande cantidades ni crea unidades/checklists.
+El material declarado en evidencia es distinto de Material (clasificación sustentada) y ruta:
+los perfiles de aluminio identificados usan AluminumProfile/Aluminum; los candidatos de Vidrios
+mantienen Material/ProposedRoute null y materialVerified=false. La lámina no se valida
+por una anotación global; su futura clasificación MicroperforatedSheet implica ruta Aluminum.
+
+Las transacciones cortas de cola comparten advisory lock `73122101` antes de bloquear filas,
+para mantener orden y evitar interbloqueos entre solicitudes/finalización/recuperación. Nunca
+retienen locks durante lectura de archivos o procesamiento PDF. El claim usa SKIP LOCKED y lease
+por TimeoutSeconds+60. Un worker vencido no puede publicar sobre el token de otro intento.
+Ante reinicio se recuperan leases vencidos; máximo tres intentos totales. Un fallo del procesador
+marca job Failed y preparación Blocked; repetir POST permite reintento solo si quedan intentos.
+Un resultado documental Blocked/Completed es terminal para esa preparación+versión de extractor:
+repetir POST devuelve el mismo job, sin duplicados. P2.3 agrega revisión humana separada y
+reextracción explícita mediante generaciones, conservando el resultado anterior.
+
+Preparación: PendingExtraction -> Blocked (errores críticos), Extracted (advertencias revisables)
+o ReadyForReview (sin incidencias). Blocked -> PendingExtraction únicamente para reintento de
+fallo técnico habilitado por el servicio. ReadyForReview nunca equivale a Approved. Actualmente
+los PDF de Vidrios requieren revisión de material/unidad, por lo que un corpus sin errores aún
+conserva advertencias. Diferencias de totales, falta de OP, líneas desconocidas, pesos faltantes,
+páginas ilegibles o evidencia no íntegra bloquean; no hay botón para ignorar discrepancias.
+
+Migración `20261113063258_IntegrateDocumentExtraction`: añade jobs y habilita estados de
+preparación/revisión. Actualiza únicamente el trigger de preparación P2.1 para permitir
+estado/revisión/extractor, preservando el resto del origen inmutable. No cambia triggers/tablas
+de Radicación ni modifica la migración anterior. Down restaura la protección P2.1, pero rechaza
+la reversión si ya hay jobs para no destruir su auditoría. No backfill de extracción histórica.
+
+### Requisitos y límites
+
+Instalar Python 3.11+ en entorno privado de despliegue con `pypdfium2==5.15.2` desde
+`src/Infrastructure/Extraction/Python/requirements.txt`. Los scripts `.py` se copian al output
+al compilar/publicar; protegerlos contra escritura del usuario del servicio. Ejemplo conceptual:
+
+```text
+DocumentExtraction:Enabled=false
+DocumentExtraction:PythonExecutable=<RUTA_ABSOLUTA_PYTHON_DEL_ENTORNO_PRIVADO>
+DocumentExtraction:MaxDocumentBytes=26214400
+DocumentExtraction:MaxPages=100
+DocumentExtraction:MemoryMb=512
+DocumentExtraction:TimeoutSeconds=90
+```
+
+No se cambian configuraciones operativas. Al habilitar, validar que la cuenta del servicio pueda
+usar Python/PDFium y sus límites de sistema. Windows: Job Object limita memoria comprometida del
+proceso y prohíbe procesos hijos. Unix: RLIMIT_AS/CPU/FSIZE. Si no se pueden aplicar límites, no
+se procesa el documento. .NET cancela/mata el árbol al vencer el tiempo; stdout máximo 16 MB,
+stderr 64 KB descartado, entrada 75 MB, 100 páginas/PDF, 200000 caracteres/página, 10000 filas/PDF.
+Máximo documento configurable hasta 25 MiB, memoria 256–1024 MiB, timeout 1–90 segundos.
+El despliegue debe usar una cuenta sin privilegios, acceso mínimo y aislamiento de red/archivos;
+los límites de recursos no constituyen un sandbox completo contra fallos nativos de PDFium.
+Linux no se validó en esta ejecución. No se habilita el worker automáticamente al migrar.
+
+### Pruebas y siguiente fase
+
+`Extraction/test_component_parser.py` cubre reglas heredadas, referencias entre páginas,
+duplicados legítimos/de lectura, encabezados, omisiones, cantidades y discrepancias.
+`DocumentProcessorTests` usa PDF sintéticos con el proceso real; activar con
+`SNG_EXTRACTION_TEST_PYTHON=<PYTHON_PRIVADO>`. `DocumentExtractionHttpChecks` se ejecuta dentro
+ del E2E con PostgreSQL temporal: solicitudes concurrentes, exclusión por lease, vencimiento,
+fallo/reintento, respuesta tardía descartada, publicación atómica, lectura de candidatos e
+integridad de bytes antes del procesador. Las suites históricas siguen verificando migraciones.
+Las pruebas PostgreSQL que comparten esquema se ejecutan en serie; las pruebas específicas de
+concurrencia conservan sus solicitudes simultáneas. No probar contra sng_control.
+
+La regresión privada de los tres ZIP compara campos y posiciones contra P1; resultados y
+PDF originales permanecen fuera de Git. No asocia esas OP con PostgreSQL. P1.1 demuestra que los
+tickets pueden ser procesos distintos, no autoridad automática: XLS/XLSX/CSV no se consumen
+en P2.2, y no se ejecutan redondeos, +4 o conversiones sin regla autorizada.
+
+P2.3 implementa la revisión/aprobación descrita a continuación. Sigue pendiente definir
+políticas de resolución documental y, posteriormente, publicación de unidades físicas.
+
+
+## Revisión humana y aprobación P2.3
+
+### Modelo y autoridad
+
+`ProductionReviewAccess` autoriza lectura al OperationsHead configurado/activo y al Management
+configurado/activo. Solo OperationsHead escribe, clasifica, adjunta evidencia o aprueba; Production
+no hereda permisos. No se modifican permisos ni endpoints históricos de Ingeniería. Las nuevas
+lecturas de fuentes se restringen a documentos del alcance confirmado de esa preparación.
+
+- `ProductionReviews`: FK compuestas a preparación, extracción exacta y revisión de componentes;
+  número, revisión de concurrencia, DataRevision, actor/UTC y Draft/Approved/Superseded.
+- `ProductionReviewRows`: identidad propia, CandidateId original nullable para adiciones manuales;
+  FK exactas de OP/StructureId y documento/hash; OriginalJson inmutable, ValuesJson corregido,
+  Reviewed y Excluded. La cantidad original se conserva en OriginalJson, nunca se reemplaza.
+- `ProductionReviewIssues`: diagnóstico original y evidencia JSON, categoría y resolución ligada
+  a DataRevision. Corregir/añadir/excluir/restaurar una fila invalida resoluciones anteriores.
+- `ProductionReviewEvents`: historial append-only con RequestKey, fingerprint, revisión resultante,
+  actor/UTC, motivo y antes/después/evidencia. Orden por número de revisión y secuencia de comando;
+  página máxima 100, `skip` no negativo. No es un log de aplicación.
+- `ProductionReviewAttachments`: bytes privados sin interpretación, nombre/MIME informativo,
+  tamaño/hash, actor/UTC y RequestKey. No son ProjectDocuments ni alteran Ingeniería.
+- `ProductionApprovals`: registro para consumo futuro, único por preparación/revisión;
+  snapshot canónico, SHA-256, actor/UTC y revisión exacta. No publica unidades ni tareas.
+
+Material y ruta se proporcionan separadamente y se validan juntos. `Glass` requiere `GLASS`;
+`AluminumProfile` y `MicroperforatedSheet` requieren `ALUMINUM`. No se infiere material por el
+archivo ni se aplican +4, redondeos o tolerancias. Una fila aprobable debe estar revisada, tener
+cantidad positiva, descripción, unidad y clasificación/ruta; perfiles necesitan referencia,
+Medida, CT y ángulos; vidrio/lámina necesitan ancho/alto. Los valores se conservan en decimal.
+
+### API y contratos para P2.4
+
+Prefijo `/api/operations/preparations/{preparationId}/reviews`:
+
+| Método/ruta | Uso |
+| --- | --- |
+| GET raíz | Revisiones por número, primeras 100; sin efectos secundarios. |
+| GET `/{reviewId}` | Origen confirmado, filas con original/corrección, grupos OP→StructureId→RowIds, incidencias, adjuntos y aprobación. |
+| GET `/history?skip=0` | Historial persistente, máximo 100; continuar paginando. |
+| POST `/commands` | Comando tipado de revisión/aprobación; máximo 1 MiB. |
+| POST `/evidence` | Multipart `requestKey`, `file`; evidencia privada, sin interpretarla. |
+| GET `/evidence/{documentId}` | Descarga autenticada de adjunto de esta preparación. |
+| GET `/sources/{documentId}` | Descarga autenticada de fuente del release exacto. |
+
+Todas las lecturas son no-store. Descargas attachment/application-octet-stream + nosniff,
+verificando hash sobre los mismos bytes devueltos. No se muestran rutas físicas. Adjuntos:
+25 MiB por archivo, máximo 50 y 250 MiB por preparación; nombre validado, extensión libre y MIME
+informativo. Carga idempotente por preparación/requestKey y fingerprint de contenido/metadatos.
+Si el resultado del commit es incierto, se conservan bytes, sin borrar evidencia potencialmente
+confirmada. No hay sustitución/eliminación de adjuntos ni modificación de documentos históricos.
+
+`ProductionReviewCommand`: RequestKey, ExpectedRevision, Action y Reason obligatorios. Start
+recibe ExtractionJobId y ExpectedRevision=0; demás comandos reciben ReviewId. Acciones:
+Start, Edit, Add, Exclude, Restore, Resolve, Note, RecordConflict, Approve, Reextract. Edit incluye
+RowId + Values (`ReviewedComponent`); Add incluye StructureId, Op exacta, SourceDocumentId y Values.
+Correcciones, adiciones, exclusiones, restauraciones, resoluciones y notas exigen `ReviewEvidence`:
+DocumentId del release **o** AttachmentId de la preparación, Locator y Observation no vacíos.
+Nunca se acepta que el cliente declare integridad o aprobación. Campos desconocidos del comando,
+valores y evidencia se rechazan. Misma clave/payload/actor reproduce resultado; clave reutilizada
+con otro contenido devuelve 409. Revision desactualizada, revisión congelada o extracción activa
+producen 409; valores inválidos, 400; autorización, 401/403 según las reglas existentes.
+
+La respuesta de comando conserva ReviewId, Revision, ApprovalId/ExtractionJobId cuando aplica.
+La consulta de extracción P2.2 ahora incluye Generation y ComponentRevisionId. P2.4 debe usar la
+revisión exacta, no agregar todos los candidatos de generaciones distintas; recargar tras 409,
+conservar claves en reintentos y mostrar todos los bloqueos sin ofrecer un bypass de aprobación.
+
+### Política de incidencias autorizada
+
+| Categoría | Casos y tratamiento |
+| --- | --- |
+| HumanReview | Material sin verificar, anotación de lámina, unidad/descripción ausente y duplicados de lectura/Piece ID. Solo resolver con evidencia/motivo y todas las filas incluidas revisadas y completas. Los duplicados físicos legítimos no se eliminan automáticamente. |
+| FormalDocumentResolution | TOTAL_MISMATCH (28/35), SOURCE_DIMENSION_CONFLICT (0,1), documento ilegible, filas/alcance incompletos, pesos/perfiles/páginas faltantes. Se pueden registrar notas/adjuntos, pero no marcar resuelto. |
+| IntegrityOrScope | OP desconocida, hash/tamaño incorrecto, alcance/procedencia inválidos y códigos no reconocidos. No subsanables mediante una simple aprobación. |
+
+No existe política formal para elegir PDF frente a XLS/XLSX/CSV, resolver diferencias de cantidades
+o dimensiones, ni tolerancias. RecordConflict registra TOTAL_MISMATCH/SOURCE_DIMENSION_CONFLICT
+con evidencia y observaciones; conserva valores originales de fuentes y nunca los normaliza para
+forzar coincidencia. Excluir una fila no elimina diagnósticos. Reextraer el mismo release hereda
+los conflictos FormalDocumentResolution/IntegrityOrScope anteriores; no los borra por obtener un
+nuevo reporte sin errores. Un cambio requerido en Ingeniería debe seguir un procedimiento documental
+formal aún no implementado por este módulo. No hay comando "aprobar ignorando errores".
+
+### Aprobación, versiones y protección
+
+Start crea una revisión editable separada solo desde un job final Completed/Blocked; copia filas
+sin cambiar candidatos y conserva sus IDs de origen. El nuevo job persiste FK a la revisión
+extraída. Jobs anteriores sin esa FK solo pueden revisarse si hay una única coincidencia exacta
+entre el reporte y las filas originales (incluido SpecificationsJson); de lo contrario se bloquea
+`ExtractionProvenanceIncomplete`, sin adivinar ni hacer backfill histórico.
+
+Approve revalida cobertura de **todas** las OP, correspondencia exacta, filas revisadas completas,
+resoluciones actuales y ausencia de conflictos. Relee manifiesto/release/versiones, tamaños y
+SHA-256 de todos sus archivos y adjuntos. Guarda snapshot con origen, filas originales/corregidas,
+exclusiones, resoluciones, hashes de evidencia y actor/UTC. Congela la revisión y crea aprobación
+atómicamente junto con el evento idempotente. Una preparación tiene como máximo una aprobación;
+no existe corrección posterior ni una segunda aprobación en esta fase.
+
+Reextract exige revisión Draft, motivo, clave y revisión esperada. Congela la anterior como
+Superseded y encola otra generación del parser disponible; no copia/fusiona correcciones por
+semejanza ni cambia IDs de filas anteriores. La nueva revisión requiere Start explícito. Los jobs
+y candidatos finalizados son inmutables. No se permite reextracción tras aprobación. La protección
+de lease y la existencia de revisión impiden que un resultado tardío sobrescriba decisiones.
+Cambiar la versión del parser no inicia una extracción automática por el endpoint antiguo.
+
+Preparation.State de P2.1 conserva el resultado de la extracción inicial; las siguientes
+generaciones tienen su propio estado en DocumentExtractionJobs/revisión de componentes. La revisión
+humana tiene estado independiente. Así no se modifica el trigger histórico de preparación ni se
+confunde reextracción con reapertura del release. La unicidad de job pasa a preparación+parser+
+generación. Un advisory lock compartido con P2.2 serializa comandos/transacciones de publicación.
+
+Migración `20261113070507_AddProductionHumanReview`: seis tablas nuevas, columnas de generación/
+revisión resultante en jobs, claves compuestas y triggers **adicionales**. No modifica funciones o
+triggers anteriores de preparación/Ingeniería. Protege originales, historia, aprobaciones, revisiones
+congeladas y consistencia snapshot↔revisión mediante constraints diferidos. Down rechaza pérdida
+de revisiones/adjuntos; no reescribe evidencia histórica. Solo probada en PostgreSQL temporal.
+
+### Verificación y decisiones pendientes
+
+`ProductionHumanReviewTests` cubre política de diagnósticos, material/ruta, cantidades y congelación.
+`ProductionHumanReviewHttpChecks`, dentro del E2E PostgreSQL sintético, cubre rol activo, lectura
+Gerencia, correcciones/auditoría, concurrencia, claves idempotentes, reextracción/versiones,
+material microperforado, adición/exclusión, adjuntos, hash alterado, aprobación única y congelación.
+Comprueba conservación de candidatos/release y ausencia de tareas/checklists. Los casos 28/35 y
+0,1 permanecen bloqueados y se heredan al reextraer. Las suites históricas verifican las migraciones.
+No se modifican datos reales ni se aplica la migración a sng_control.
+
+P2.4: pantallas de lectura comparada original/corregido, agrupación OP/material/ruta, evidencia,
+clasificación/corrección con motivo, estado de revisión, conflictos abiertos, historial y
+confirmación explícita de aprobación. Faltan decisiones formales sobre precedencia de fuentes,
+resolución documental, correcciones de una preparación aprobada y futuras unidades/checklists.
+No existe aún autorización ejecutable para fabricar desde este resultado.
